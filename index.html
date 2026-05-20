@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>普高精舍 複習答題</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --orange:       #E8640A;
+      --orange-light: #FFA040;
+      --orange-pale:  #FFF3E8;
+      --bg:           #FDF6EE;
+      --card:         #FFFFFF;
+      --text:         #2D1A00;
+      --text-sub:     #7A5C3A;
+      --correct:      #2E8B57;
+      --correct-bg:   #EAF7EE;
+      --wrong:        #C0392B;
+      --wrong-bg:     #FDEDED;
+      --neutral-bg:   #F5F0EA;
+      --neutral-text: #9A8070;
+      --radius:       16px;
+      --shadow:       0 4px 20px rgba(232,100,10,0.10);
+    }
+    body {
+      font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh;
+    }
+    header {
+      background: var(--orange); color: #fff;
+      text-align: center; padding: 20px 16px 16px;
+    }
+    header h1 { font-size: 24px; font-weight: 700; letter-spacing: 2px; }
+    header p  { font-size: 14px; margin-top: 4px; opacity: 0.85; }
+
+    .screen { display: none; padding: 24px 16px 40px; max-width: 480px; margin: 0 auto; }
+    .screen.active { display: block; }
+
+    /* ── 班級選擇 ── */
+    .section-title {
+      font-size: 20px; font-weight: 700;
+      text-align: center; margin: 8px 0 20px; color: var(--orange);
+    }
+    .class-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .class-btn {
+      background: var(--card); border: 2.5px solid var(--orange-light);
+      border-radius: var(--radius); padding: 22px 12px;
+      font-size: 20px; font-weight: 700; color: var(--orange);
+      cursor: pointer; text-align: center; box-shadow: var(--shadow);
+      transition: background .15s, color .15s, transform .1s;
+    }
+    .class-btn:hover, .class-btn:active {
+      background: var(--orange); color: #fff; transform: scale(1.03);
+    }
+    .class-btn span {
+      display: block; font-size: 13px; font-weight: 400; opacity: .7; margin-top: 4px;
+    }
+
+    /* ── 載入中 ── */
+    .loading-wrap {
+      text-align: center; padding: 60px 20px;
+    }
+    .spinner {
+      width: 48px; height: 48px; border: 5px solid var(--orange-pale);
+      border-top-color: var(--orange); border-radius: 50%;
+      animation: spin .8s linear infinite; margin: 0 auto 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 17px; color: var(--text-sub); }
+
+    /* ── 錯誤 ── */
+    .error-card {
+      background: var(--card); border-radius: var(--radius);
+      padding: 32px 24px; text-align: center; box-shadow: var(--shadow); margin-top: 20px;
+    }
+    .error-icon { font-size: 48px; margin-bottom: 12px; }
+    .error-card p { font-size: 17px; color: var(--text-sub); line-height: 1.7; }
+    .back-btn {
+      margin-top: 24px; background: var(--orange); color: #fff; border: none;
+      border-radius: 12px; padding: 14px 32px; font-size: 17px; font-weight: 700; cursor: pointer;
+    }
+
+    /* ── 答題 ── */
+    .progress-bar-wrap { background: #F2D9C0; border-radius: 99px; height: 8px; margin-bottom: 8px; }
+    .progress-bar { background: var(--orange); height: 8px; border-radius: 99px; transition: width .3s; }
+    .progress-label { font-size: 13px; color: var(--text-sub); text-align: right; margin-bottom: 16px; }
+
+    .question-card {
+      background: var(--card); border-radius: var(--radius);
+      padding: 24px 20px; box-shadow: var(--shadow); margin-bottom: 20px;
+    }
+    .question-type {
+      font-size: 12px; font-weight: 700; background: var(--orange-pale); color: var(--orange);
+      border-radius: 99px; display: inline-block; padding: 3px 12px; margin-bottom: 12px;
+    }
+    .question-text { font-size: 20px; line-height: 1.8; font-weight: 600; white-space: pre-line; }
+    .blank {
+      display: inline-block; border-bottom: 3px solid var(--orange);
+      min-width: 2em; text-align: center; color: var(--orange);
+      font-weight: 700; padding: 0 4px;
+    }
+
+    .options { display: flex; flex-direction: column; gap: 12px; }
+    .option-btn {
+      background: var(--card); border: 2px solid #E0C8A8; border-radius: 12px;
+      padding: 14px 16px; font-size: 17px; font-weight: 500; color: var(--text);
+      cursor: pointer; text-align: left; transition: background .15s, border-color .15s; width: 100%;
+    }
+    .option-btn:not(.disabled):hover { border-color: var(--orange); background: var(--orange-pale); }
+    .option-btn.correct  { background: var(--correct-bg); border-color: var(--correct); }
+    .option-btn.wrong    { background: var(--wrong-bg);   border-color: var(--wrong);   }
+    .option-btn.neutral  { background: var(--neutral-bg); border-color: #D5C8B8; }
+    .option-btn.disabled { cursor: default; }
+    .opt-main { display: flex; align-items: flex-start; gap: 8px; }
+    .opt-label-tag { font-size: 16px; font-weight: 700; flex-shrink: 0; min-width: 28px; }
+    .opt-text { font-size: 17px; line-height: 1.5; }
+    .opt-exp {
+      display: none; margin-top: 10px; padding-top: 10px;
+      border-top: 1px solid rgba(0,0,0,0.08);
+      font-size: 14px; line-height: 1.7; font-weight: 400;
+    }
+    .option-btn.correct .opt-exp { display: block; color: var(--correct); }
+    .option-btn.wrong   .opt-exp { display: block; color: var(--wrong); }
+    .option-btn.neutral .opt-exp { display: block; color: var(--neutral-text); }
+    .correct-badge {
+      display: none; float: right; background: var(--correct); color: #fff;
+      font-size: 12px; font-weight: 700; border-radius: 99px; padding: 2px 10px; margin-left: 8px;
+    }
+    .option-btn.correct .correct-badge { display: inline-block; }
+
+    #options-hint { font-size: 15px; color: var(--text-sub); margin-bottom: 10px; display: none; }
+
+    .next-btn {
+      display: none; width: 100%; background: var(--orange); color: #fff;
+      border: none; border-radius: 12px; padding: 18px;
+      font-size: 18px; font-weight: 700; cursor: pointer; margin-top: 16px; letter-spacing: 1px;
+    }
+    .next-btn.show { display: block; }
+    .next-btn:hover { background: #C5540A; }
+
+    /* ── 完成 ── */
+    .finish-card {
+      background: var(--card); border-radius: var(--radius);
+      padding: 40px 24px; text-align: center; box-shadow: var(--shadow); margin-top: 20px;
+    }
+    .finish-icon { font-size: 56px; margin-bottom: 16px; }
+    .finish-card h2 { font-size: 26px; color: var(--orange); margin-bottom: 10px; }
+    .finish-card p  { font-size: 17px; color: var(--text-sub); line-height: 1.7; }
+    .restart-btn {
+      margin-top: 28px; background: var(--orange); color: #fff; border: none;
+      border-radius: 12px; padding: 16px 36px; font-size: 18px; font-weight: 700; cursor: pointer;
+    }
+    .restart-btn:hover { background: #C5540A; }
+  </style>
+</head>
+<body>
+
+<header>
+  <img src="資產 3_0.png" alt="普高精舍"
+    style="width:64px;height:64px;border-radius:50%;object-fit:cover;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.18);" />
+  <h1>普高精舍　複習答題</h1>
+  <p>選擇班級，開始複習今日內容</p>
+</header>
+
+<!-- 班級選擇 -->
+<div class="screen active" id="screen-home">
+  <p class="section-title">請選擇您的班級</p>
+  <div class="class-grid">
+    <button class="class-btn" onclick="startQuiz('初級班')">初級班</button>
+    <button class="class-btn" onclick="startQuiz('中級班')">中級班</button>
+    <button class="class-btn" onclick="startQuiz('高一班')">高一班</button>
+    <button class="class-btn" onclick="startQuiz('高二班')">高二班</button>
+    <button class="class-btn" onclick="startQuiz('研一班')">研一班</button>
+    <button class="class-btn" onclick="startQuiz('研二班')">研二班</button>
+    <button class="class-btn" onclick="startQuiz('研三班')">研三班</button>
+    <button class="class-btn" onclick="startQuiz('研四班')">研四班</button>
+  </div>
+</div>
+
+<!-- 載入中 -->
+<div class="screen" id="screen-loading">
+  <div class="loading-wrap">
+    <div class="spinner"></div>
+    <p class="loading-text">載入題目中…</p>
+  </div>
+</div>
+
+<!-- 錯誤 -->
+<div class="screen" id="screen-error">
+  <div class="error-card">
+    <div class="error-icon">😔</div>
+    <p id="error-msg">載入失敗，請稍後再試。</p>
+    <button class="back-btn" onclick="goHome()">返回</button>
+  </div>
+</div>
+
+<!-- 答題 -->
+<div class="screen" id="screen-quiz">
+  <div class="progress-bar-wrap">
+    <div class="progress-bar" id="prog-bar" style="width:0%"></div>
+  </div>
+  <div class="progress-label" id="prog-label"></div>
+  <div class="question-card">
+    <div class="question-type" id="q-type"></div>
+    <div class="question-text" id="q-text"></div>
+  </div>
+  <div id="options-hint">請選擇填入空格的字詞：</div>
+  <div class="options" id="options-wrap"></div>
+  <button class="next-btn" id="next-btn" onclick="nextQuestion()">下一題 →</button>
+</div>
+
+<!-- 完成 -->
+<div class="screen" id="screen-finish">
+  <div class="finish-card">
+    <div class="finish-icon">🎉</div>
+    <h2>完成！</h2>
+    <p>您已完成本次複習，<br>隨喜法喜充滿！</p>
+    <button class="restart-btn" onclick="goHome()">返回班級選擇</button>
+  </div>
+</div>
+
+<script>
+  const API_URL = 'https://script.google.com/macros/s/AKfycbyeFWRmOrVbuQE6VN4deTLN_Dc6eLApF-ZJ1hFykgffSQxTkneD1gZ2diSiLUQLhIY7xw/exec';
+  const LABELS = ['Ａ', 'Ｂ', 'Ｃ', 'Ｄ'];
+  let questions = [];
+  let currentQ = 0;
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function goHome() { showScreen('screen-home'); }
+
+  function showError(msg) {
+    document.getElementById('error-msg').textContent = msg;
+    showScreen('screen-error');
+  }
+
+  // API 格式 → UI 格式
+  function apiToQuestion(q) {
+    const answerMap = { A: 0, B: 1, C: 2, D: 3 };
+    return {
+      type: q.type,
+      text: q.text,
+      options: [
+        { text: q.optA, exp: q.expA },
+        { text: q.optB, exp: q.expB },
+        { text: q.optC, exp: q.expC },
+        { text: q.optD, exp: q.expD },
+      ],
+      answer: answerMap[String(q.answer).toUpperCase()] ?? 0
+    };
+  }
+
+  async function startQuiz(className) {
+    showScreen('screen-loading');
+    try {
+      const res = await fetch(`${API_URL}?action=getQuestions&class=${encodeURIComponent(className)}`);
+      const data = await res.json();
+      if (data.success && data.questions && data.questions.length > 0) {
+        questions = data.questions.map(apiToQuestion);
+        currentQ = 0;
+        showScreen('screen-quiz');
+        renderQuestion();
+      } else {
+        showError('這個班級目前沒有題目，請聯繫管理員。');
+      }
+    } catch (e) {
+      showError('無法連接到題庫，請確認網路連線後再試。');
+    }
+  }
+
+  function renderQuestionText(text) {
+    return String(text).replace(/\[空\]/g, '<span class="blank">　　</span>');
+  }
+
+  function renderQuestion() {
+    const q = questions[currentQ];
+    const total = questions.length;
+    const pct = Math.round((currentQ / total) * 100);
+
+    document.getElementById('prog-bar').style.width = pct + '%';
+    document.getElementById('prog-label').textContent = `第 ${currentQ + 1} 題 / 共 ${total} 題`;
+    document.getElementById('q-type').textContent = q.type === 'fill' ? '填充題' : '選擇題';
+    document.getElementById('q-text').innerHTML = renderQuestionText(q.text);
+    document.getElementById('next-btn').className = 'next-btn';
+
+    const hint = document.getElementById('options-hint');
+    hint.style.display = q.type === 'fill' ? 'block' : 'none';
+
+    const wrap = document.getElementById('options-wrap');
+    wrap.innerHTML = '';
+
+    if (q.type === 'fill') {
+      wrap.style.cssText = 'display:flex;flex-direction:row;flex-wrap:wrap;gap:12px;';
+    } else {
+      wrap.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
+    }
+
+    q.options.forEach((opt, i) => {
+      const btn = document.createElement('button');
+      if (q.type === 'fill') {
+        btn.className = 'option-btn fill-option';
+        btn.style.cssText = 'width:calc(50% - 6px);text-align:center;padding:18px 8px;';
+        btn.innerHTML = `
+          <div class="opt-label-tag" style="font-size:13px;color:var(--text-sub);margin-bottom:6px;">${LABELS[i]}</div>
+          <div style="font-size:22px;font-weight:700;">${opt.text}</div>
+          <div class="opt-exp" style="font-size:13px;">${opt.exp}</div>`;
+      } else {
+        btn.className = 'option-btn';
+        btn.innerHTML = `
+          <div class="opt-main">
+            <span class="opt-label-tag">${LABELS[i]}</span>
+            <span class="opt-text">${opt.text}<span class="correct-badge">答對了！</span></span>
+          </div>
+          <div class="opt-exp">${opt.exp}</div>`;
+      }
+      btn.onclick = () => selectOption(i, q);
+      wrap.appendChild(btn);
+    });
+  }
+
+  function selectOption(idx, q) {
+    document.querySelectorAll('.option-btn').forEach((btn, i) => {
+      btn.classList.add('disabled');
+      if (i === q.answer)      btn.classList.add('correct');
+      else if (i === idx)      btn.classList.add('wrong');
+      else                     btn.classList.add('neutral');
+    });
+    document.getElementById('next-btn').className = 'next-btn show';
+  }
+
+  function nextQuestion() {
+    currentQ++;
+    if (currentQ >= questions.length) showScreen('screen-finish');
+    else renderQuestion();
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>普高精舍 題庫管理</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --orange: #E8640A; --orange-light: #FFA040; --orange-pale: #FFF3E8;
+      --bg: #FDF6EE; --card: #fff; --text: #2D1A00; --text-sub: #7A5C3A;
+      --radius: 12px; --shadow: 0 2px 12px rgba(232,100,10,0.10);
+      --red: #C0392B; --green: #2E8B57;
+    }
+    body { font-family: "Noto Sans TC","Microsoft JhengHei",sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    header { background: var(--orange); color: #fff; padding: 16px 20px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 20px; font-weight: 700; }
+    header span { font-size: 13px; opacity: .8; margin-left: auto; }
+
+    /* ── 登入 ── */
+    #login-screen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 80vh; padding: 20px;
+    }
+    .login-card {
+      background: var(--card); border-radius: var(--radius);
+      padding: 40px 32px; width: 100%; max-width: 360px;
+      box-shadow: var(--shadow); text-align: center;
+    }
+    .login-card h2 { font-size: 22px; color: var(--orange); margin-bottom: 8px; }
+    .login-card p { font-size: 14px; color: var(--text-sub); margin-bottom: 24px; }
+    .login-card input {
+      width: 100%; border: 2px solid #E0C8A8; border-radius: 8px;
+      padding: 12px 14px; font-size: 16px; margin-bottom: 12px;
+    }
+    .login-card input:focus { outline: none; border-color: var(--orange); }
+    .login-btn {
+      width: 100%; background: var(--orange); color: #fff; border: none;
+      border-radius: 8px; padding: 14px; font-size: 16px; font-weight: 700; cursor: pointer;
+    }
+    .login-err { color: var(--red); font-size: 14px; margin-top: 8px; display: none; }
+
+    /* ── 主介面 ── */
+    #main-screen { display: none; }
+    .tabs {
+      display: flex; background: var(--card); border-bottom: 2px solid var(--orange-pale);
+      padding: 0 16px;
+    }
+    .tab-btn {
+      padding: 14px 18px; font-size: 15px; font-weight: 600; color: var(--text-sub);
+      border: none; background: none; cursor: pointer; border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+    }
+    .tab-btn.active { color: var(--orange); border-bottom-color: var(--orange); }
+
+    .tab-panel { display: none; padding: 20px 16px; max-width: 760px; margin: 0 auto; }
+    .tab-panel.active { display: block; }
+
+    /* ── 共用元件 ── */
+    label { display: block; font-size: 13px; font-weight: 600; color: var(--text-sub); margin-bottom: 4px; margin-top: 14px; }
+    input[type=text], textarea, select {
+      width: 100%; border: 2px solid #E0C8A8; border-radius: 8px;
+      padding: 10px 12px; font-size: 15px; font-family: inherit;
+      background: #fff; color: var(--text);
+    }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: var(--orange); }
+    textarea { resize: vertical; min-height: 80px; }
+
+    .btn {
+      display: inline-block; border: none; border-radius: 8px;
+      padding: 10px 20px; font-size: 15px; font-weight: 700; cursor: pointer;
+    }
+    .btn-primary { background: var(--orange); color: #fff; }
+    .btn-primary:hover { background: #C5540A; }
+    .btn-danger  { background: var(--red); color: #fff; }
+    .btn-danger:hover  { background: #a02020; }
+    .btn-ghost   { background: #F0E8DC; color: var(--text); }
+    .btn-ghost:hover { background: #E0D0C0; }
+
+    .msg { font-size: 14px; padding: 10px 14px; border-radius: 8px; margin-top: 12px; display: none; }
+    .msg.ok  { background: #EAF7EE; color: var(--green); display: block; }
+    .msg.err { background: #FDEDED; color: var(--red); display: block; }
+
+    /* ── 班級篩選 ── */
+    .class-filter { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .cf-btn {
+      padding: 6px 14px; border-radius: 99px; border: 2px solid var(--orange-light);
+      font-size: 14px; font-weight: 600; cursor: pointer; background: #fff; color: var(--orange);
+    }
+    .cf-btn.active { background: var(--orange); color: #fff; border-color: var(--orange); }
+
+    /* ── 題目列表 ── */
+    .q-list { display: flex; flex-direction: column; gap: 10px; }
+    .q-card {
+      background: var(--card); border-radius: var(--radius);
+      padding: 14px 16px; box-shadow: var(--shadow);
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .q-card.disabled-q { opacity: .5; }
+    .q-toggle {
+      width: 44px; height: 24px; border-radius: 99px; border: none; cursor: pointer;
+      background: #D0C0B0; position: relative; flex-shrink: 0; margin-top: 2px;
+      transition: background .2s;
+    }
+    .q-toggle.on { background: var(--green); }
+    .q-toggle::after {
+      content: ''; position: absolute; width: 18px; height: 18px;
+      background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: left .2s;
+    }
+    .q-toggle.on::after { left: 23px; }
+    .q-body { flex: 1; min-width: 0; }
+    .q-meta { font-size: 12px; color: var(--text-sub); margin-bottom: 4px; }
+    .q-meta span { background: var(--orange-pale); color: var(--orange); padding: 2px 8px; border-radius: 99px; margin-right: 4px; font-weight: 700; }
+    .q-text-preview { font-size: 15px; font-weight: 600; line-height: 1.5; }
+    .q-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .q-actions .btn { padding: 6px 14px; font-size: 13px; }
+
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--text-sub); font-size: 15px; }
+
+    /* ── 新增表單 ── */
+    .form-card { background: var(--card); border-radius: var(--radius); padding: 24px 20px; box-shadow: var(--shadow); }
+    .form-card h3 { font-size: 18px; font-weight: 700; color: var(--orange); margin-bottom: 4px; }
+    .option-group {
+      background: var(--orange-pale); border-radius: 10px; padding: 14px; margin-top: 8px;
+    }
+    .option-group h4 { font-size: 14px; font-weight: 700; color: var(--orange); margin-bottom: 8px; }
+    .form-actions { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+    /* ── 批次匯入 ── */
+    .import-steps { counter-reset: step; }
+    .import-step {
+      background: var(--card); border-radius: var(--radius);
+      padding: 20px; box-shadow: var(--shadow); margin-bottom: 14px;
+      counter-increment: step;
+    }
+    .import-step h3::before {
+      content: counter(step) ". ";
+      color: var(--orange); font-weight: 700;
+    }
+    .import-step h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+    .parse-preview {
+      background: var(--orange-pale); border-radius: 8px; padding: 12px; margin-top: 12px;
+      font-size: 13px; max-height: 200px; overflow-y: auto;
+    }
+    .parse-preview .parse-q { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #F0D8C0; }
+    .parse-preview .parse-q:last-child { border-bottom: none; margin-bottom: 0; }
+
+    /* ── Loading overlay ── */
+    #loading-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(255,255,255,.75);
+      z-index: 999; align-items: center; justify-content: center;
+    }
+    #loading-overlay.show { display: flex; }
+    .overlay-spinner {
+      width: 48px; height: 48px; border: 5px solid var(--orange-pale);
+      border-top-color: var(--orange); border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<header>
+  <img src="資產 3_0.png" alt="" style="width:36px;height:36px;border-radius:50%;object-fit:cover;" />
+  <h1>普高精舍　題庫管理</h1>
+  <span id="admin-class-label"></span>
+</header>
+
+<!-- Loading overlay -->
+<div id="loading-overlay"><div class="overlay-spinner"></div></div>
+
+<!-- 登入 -->
+<div id="login-screen">
+  <div class="login-card">
+    <h2>管理員登入</h2>
+    <p>請輸入管理密碼</p>
+    <input type="password" id="pw-input" placeholder="密碼" onkeydown="if(event.key==='Enter')login()" />
+    <button class="login-btn" onclick="login()">登入</button>
+    <p class="login-err" id="login-err">密碼錯誤，請再試一次。</p>
+  </div>
+</div>
+
+<!-- 主介面 -->
+<div id="main-screen">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('tab-list')">📋 題庫管理</button>
+    <button class="tab-btn" onclick="switchTab('tab-add')">➕ 新增題目</button>
+    <button class="tab-btn" onclick="switchTab('tab-import')">📥 批次匯入</button>
+  </div>
+
+  <!-- ═══ Tab 1：題庫管理 ═══ -->
+  <div class="tab-panel active" id="tab-list">
+    <div class="class-filter" id="class-filter-btns"></div>
+    <div id="q-list-wrap"><p class="empty-state">選擇班級後載入題目…</p></div>
+  </div>
+
+  <!-- ═══ Tab 2：新增題目 ═══ -->
+  <div class="tab-panel" id="tab-add">
+    <div class="form-card">
+      <h3 id="form-title">新增題目</h3>
+      <input type="hidden" id="edit-id" value="" />
+
+      <label>班級</label>
+      <select id="f-class">
+        <option>初級班</option><option>中級班</option>
+        <option>高一班</option><option>高二班</option>
+        <option>研一班</option><option>研二班</option>
+        <option>研三班</option><option>研四班</option>
+      </select>
+
+      <label>題型</label>
+      <select id="f-type" onchange="updateTypeHint()">
+        <option value="choice">選擇題</option>
+        <option value="fill">填充題（挖空選字詞）</option>
+      </select>
+      <p id="type-hint" style="font-size:12px;color:var(--text-sub);margin-top:4px;">
+        填充題請在題目中用 [空] 標記挖空位置，例如：「諸惡[空]作，眾善[空]行」
+      </p>
+
+      <label>題目</label>
+      <textarea id="f-text" placeholder="在此輸入題目內容…" rows="3"></textarea>
+
+      <div class="option-group">
+        <h4>選項 A</h4>
+        <label style="margin-top:0">選項文字</label>
+        <input type="text" id="f-optA" placeholder="選項A的文字" />
+        <label>解釋說明</label>
+        <textarea id="f-expA" rows="2" placeholder="為什麼這個選項對或錯？"></textarea>
+      </div>
+      <div class="option-group">
+        <h4>選項 B</h4>
+        <label style="margin-top:0">選項文字</label>
+        <input type="text" id="f-optB" placeholder="選項B的文字" />
+        <label>解釋說明</label>
+        <textarea id="f-expB" rows="2" placeholder="為什麼這個選項對或錯？"></textarea>
+      </div>
+      <div class="option-group">
+        <h4>選項 C</h4>
+        <label style="margin-top:0">選項文字</label>
+        <input type="text" id="f-optC" placeholder="選項C的文字" />
+        <label>解釋說明</label>
+        <textarea id="f-expC" rows="2" placeholder="為什麼這個選項對或錯？"></textarea>
+      </div>
+      <div class="option-group">
+        <h4>選項 D</h4>
+        <label style="margin-top:0">選項文字</label>
+        <input type="text" id="f-optD" placeholder="選項D的文字" />
+        <label>解釋說明</label>
+        <textarea id="f-expD" rows="2" placeholder="為什麼這個選項對或錯？"></textarea>
+      </div>
+
+      <label>正確答案</label>
+      <select id="f-answer">
+        <option value="A">A</option>
+        <option value="B">B</option>
+        <option value="C">C</option>
+        <option value="D">D</option>
+      </select>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="submitForm()">儲存題目</button>
+        <button class="btn btn-ghost" onclick="clearForm()">清除</button>
+      </div>
+      <div class="msg" id="form-msg"></div>
+    </div>
+  </div>
+
+  <!-- ═══ Tab 3：批次匯入 ═══ -->
+  <div class="tab-panel" id="tab-import">
+    <div class="import-steps">
+      <div class="import-step">
+        <h3>從 NotebookLM 複製題目文字</h3>
+        <p style="font-size:14px;color:var(--text-sub);line-height:1.7;">
+          在 NotebookLM 測驗頁面，完成一輪測驗後，<br>
+          全選題目文字（包含選項和解釋），複製後貼到下方。
+        </p>
+      </div>
+
+      <div class="import-step">
+        <h3>貼上並解析</h3>
+        <label>選擇這批題目的班級</label>
+        <select id="import-class">
+          <option>初級班</option><option>中級班</option>
+          <option>高一班</option><option>高二班</option>
+          <option>研一班</option><option>研二班</option>
+          <option>研三班</option><option>研四班</option>
+        </select>
+        <label>貼上題目文字</label>
+        <textarea id="import-text" rows="10" placeholder="在此貼上從 NotebookLM 複製的文字…"></textarea>
+        <div style="margin-top:12px;">
+          <button class="btn btn-ghost" onclick="parseImport()">解析預覽</button>
+        </div>
+        <div class="parse-preview" id="parse-preview" style="display:none"></div>
+        <div class="msg" id="parse-msg"></div>
+      </div>
+
+      <div class="import-step" id="import-confirm-step" style="display:none">
+        <h3>確認匯入</h3>
+        <p style="font-size:14px;color:var(--text-sub);" id="parse-count-label"></p>
+        <div style="margin-top:12px;">
+          <button class="btn btn-primary" onclick="confirmImport()">確認匯入</button>
+          <button class="btn btn-ghost" style="margin-left:8px;" onclick="cancelImport()">取消</button>
+        </div>
+        <div class="msg" id="import-msg"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_URL = 'https://script.google.com/macros/s/AKfycbyeFWRmOrVbuQE6VN4deTLN_Dc6eLApF-ZJ1hFykgffSQxTkneD1gZ2diSiLUQLhIY7xw/exec';
+  const PASSWORD = 'pugao2026'; // 管理員密碼（可修改）
+  const CLASSES = ['初級班','中級班','高一班','高二班','研一班','研二班','研三班','研四班'];
+
+  let currentClass = CLASSES[0];
+  let parsedQuestions = [];
+
+  // ── 登入 ──
+  function login() {
+    const pw = document.getElementById('pw-input').value;
+    if (pw === PASSWORD) {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('main-screen').style.display = 'block';
+      initClassFilter();
+      loadList(CLASSES[0]);
+    } else {
+      document.getElementById('login-err').style.display = 'block';
+    }
+  }
+
+  // ── Tab 切換 ──
+  function switchTab(id) {
+    document.querySelectorAll('.tab-btn').forEach((b,i) => {
+      b.classList.toggle('active', ['tab-list','tab-add','tab-import'][i] === id);
+    });
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  // ── 班級篩選 ──
+  function initClassFilter() {
+    const wrap = document.getElementById('class-filter-btns');
+    CLASSES.forEach(cls => {
+      const btn = document.createElement('button');
+      btn.className = 'cf-btn' + (cls === currentClass ? ' active' : '');
+      btn.textContent = cls;
+      btn.onclick = () => { currentClass = cls; loadList(cls); updateFilterBtns(); };
+      wrap.appendChild(btn);
+    });
+  }
+
+  function updateFilterBtns() {
+    document.querySelectorAll('.cf-btn').forEach((b, i) => {
+      b.classList.toggle('active', CLASSES[i] === currentClass);
+    });
+  }
+
+  // ── API 工具 ──
+  function loading(on) {
+    document.getElementById('loading-overlay').classList.toggle('show', on);
+  }
+
+  async function apiGet(params) {
+    const url = API_URL + '?' + new URLSearchParams(params).toString();
+    const res = await fetch(url);
+    return await res.json();
+  }
+
+  async function apiPost(data) {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(data)
+    });
+    return await res.json();
+  }
+
+  // ── 載入題目列表 ──
+  async function loadList(cls) {
+    currentClass = cls;
+    updateFilterBtns();
+    loading(true);
+    try {
+      const data = await apiGet({ action: 'getAll', class: cls });
+      renderList(data.questions || []);
+    } catch(e) {
+      document.getElementById('q-list-wrap').innerHTML =
+        '<p class="empty-state">載入失敗，請確認網路連線。</p>';
+    }
+    loading(false);
+  }
+
+  function renderList(qs) {
+    const wrap = document.getElementById('q-list-wrap');
+    if (!qs.length) {
+      wrap.innerHTML = '<p class="empty-state">這個班級還沒有題目，請從「新增題目」開始。</p>';
+      return;
+    }
+    wrap.innerHTML = '<div class="q-list">' + qs.map(q => `
+      <div class="q-card ${q.enabled ? '' : 'disabled-q'}" id="qc-${q.id}">
+        <button class="q-toggle ${q.enabled ? 'on' : ''}" onclick="toggle(${q.id})" title="${q.enabled ? '停用' : '啟用'}"></button>
+        <div class="q-body">
+          <div class="q-meta">
+            <span>${q.type === 'fill' ? '填充題' : '選擇題'}</span>
+            答案：${q.answer}
+          </div>
+          <div class="q-text-preview">${String(q.text).slice(0,60)}${String(q.text).length > 60 ? '…' : ''}</div>
+          <div class="q-actions">
+            <button class="btn btn-ghost" onclick="editQ(${q.id})">✏️ 編輯</button>
+            <button class="btn btn-danger" onclick="deleteQ(${q.id})">🗑️ 刪除</button>
+          </div>
+        </div>
+      </div>`).join('') + '</div>';
+  }
+
+  // ── 啟用 / 停用 ──
+  async function toggle(id) {
+    loading(true);
+    try {
+      const r = await apiPost({ action: 'toggleEnable', id });
+      if (r.success) loadList(currentClass);
+    } catch(e) { alert('操作失敗'); }
+    loading(false);
+  }
+
+  // ── 刪除 ──
+  async function deleteQ(id) {
+    if (!confirm('確定要刪除這道題目嗎？')) return;
+    loading(true);
+    try {
+      const r = await apiPost({ action: 'deleteQuestion', id });
+      if (r.success) loadList(currentClass);
+      else alert('刪除失敗：' + r.error);
+    } catch(e) { alert('操作失敗'); }
+    loading(false);
+  }
+
+  // ── 編輯（載入到表單）──
+  async function editQ(id) {
+    loading(true);
+    try {
+      const data = await apiGet({ action: 'getAll', class: currentClass });
+      const q = (data.questions || []).find(x => String(x.id) === String(id));
+      if (!q) { alert('找不到題目'); loading(false); return; }
+
+      document.getElementById('edit-id').value = q.id;
+      document.getElementById('form-title').textContent = '編輯題目';
+      document.getElementById('f-class').value = q.class;
+      document.getElementById('f-type').value = q.type;
+      document.getElementById('f-text').value = q.text;
+      document.getElementById('f-optA').value = q.optA;
+      document.getElementById('f-expA').value = q.expA;
+      document.getElementById('f-optB').value = q.optB;
+      document.getElementById('f-expB').value = q.expB;
+      document.getElementById('f-optC').value = q.optC;
+      document.getElementById('f-expC').value = q.expC;
+      document.getElementById('f-optD').value = q.optD;
+      document.getElementById('f-expD').value = q.expD;
+      document.getElementById('f-answer').value = q.answer;
+      updateTypeHint();
+      switchTab('tab-add');
+    } catch(e) { alert('載入失敗'); }
+    loading(false);
+  }
+
+  // ── 表單送出 ──
+  async function submitForm() {
+    const q = {
+      class: document.getElementById('f-class').value,
+      type:  document.getElementById('f-type').value,
+      text:  document.getElementById('f-text').value.trim(),
+      optA:  document.getElementById('f-optA').value.trim(),
+      expA:  document.getElementById('f-expA').value.trim(),
+      optB:  document.getElementById('f-optB').value.trim(),
+      expB:  document.getElementById('f-expB').value.trim(),
+      optC:  document.getElementById('f-optC').value.trim(),
+      expC:  document.getElementById('f-expC').value.trim(),
+      optD:  document.getElementById('f-optD').value.trim(),
+      expD:  document.getElementById('f-expD').value.trim(),
+      answer: document.getElementById('f-answer').value,
+    };
+    if (!q.text || !q.optA || !q.optB || !q.optC || !q.optD) {
+      showMsg('form-msg', '題目和四個選項文字都必須填寫。', false); return;
+    }
+    const editId = document.getElementById('edit-id').value;
+    loading(true);
+    try {
+      const r = await apiPost(editId
+        ? { action: 'updateQuestion', id: editId, question: q }
+        : { action: 'addQuestion', question: q });
+      if (r.success) {
+        showMsg('form-msg', editId ? '題目已更新！' : '題目已新增！', true);
+        clearForm();
+        currentClass = q.class;
+        loadList(currentClass);
+      } else {
+        showMsg('form-msg', '儲存失敗：' + (r.error || '未知錯誤'), false);
+      }
+    } catch(e) { showMsg('form-msg', '連線失敗，請稍後再試。', false); }
+    loading(false);
+  }
+
+  function clearForm() {
+    document.getElementById('edit-id').value = '';
+    document.getElementById('form-title').textContent = '新增題目';
+    ['f-text','f-optA','f-expA','f-optB','f-expB','f-optC','f-expC','f-optD','f-expD']
+      .forEach(id => document.getElementById(id).value = '');
+    document.getElementById('f-answer').value = 'A';
+    document.getElementById('form-msg').className = 'msg';
+  }
+
+  function updateTypeHint() {
+    const isFill = document.getElementById('f-type').value === 'fill';
+    document.getElementById('type-hint').style.display = isFill ? 'block' : 'none';
+  }
+
+  // ── 批次匯入解析 ──
+  function parseImport() {
+    const text = document.getElementById('import-text').value.trim();
+    if (!text) { showMsg('parse-msg', '請先貼上題目文字。', false); return; }
+
+    parsedQuestions = parseNotebookLM(text);
+    const preview = document.getElementById('parse-preview');
+    const confirmStep = document.getElementById('import-confirm-step');
+    const msg = document.getElementById('parse-msg');
+
+    if (!parsedQuestions.length) {
+      preview.style.display = 'none';
+      confirmStep.style.display = 'none';
+      showMsg('parse-msg', '解析失敗，找不到符合格式的題目。請確認文字是否完整複製。', false);
+      return;
+    }
+
+    msg.className = 'msg';
+    preview.style.display = 'block';
+    preview.innerHTML = parsedQuestions.map((q, i) => `
+      <div class="parse-q">
+        <strong>第 ${i+1} 題（答案：${q.answer}）</strong><br>
+        ${q.text.slice(0, 60)}…<br>
+        <small style="color:var(--text-sub);">A: ${q.optA} ／ B: ${q.optB} ／ C: ${q.optC} ／ D: ${q.optD}</small>
+      </div>`).join('');
+
+    document.getElementById('parse-count-label').textContent =
+      `共解析出 ${parsedQuestions.length} 題，確認後匯入到「${document.getElementById('import-class').value}」。`;
+    confirmStep.style.display = 'block';
+  }
+
+  // NotebookLM 文字解析器
+  function parseNotebookLM(text) {
+    const results = [];
+    // 用空行分隔，找出每個題目區塊
+    const blocks = text.split(/\n{2,}/);
+    let current = null;
+    let optKey = null;
+
+    for (let i = 0; i < blocks.length; i++) {
+      const block = blocks[i].trim();
+      if (!block) continue;
+
+      // 嘗試判斷是否為選項行（A. B. C. D.）
+      const optMatch = block.match(/^([ABCD])[.、．]\s*(.+)/s);
+      if (optMatch && current) {
+        optKey = optMatch[1];
+        const optText = optMatch[2].replace('答對了！', '').trim();
+        current[`opt${optKey}`] = optText;
+        if (block.includes('答對了')) current.answer = optKey;
+        continue;
+      }
+
+      // 如果上一個 block 是選項，這個是解釋
+      if (optKey && current && !block.match(/^[ABCD][.、．]/)) {
+        const expText = block.replace('答對了！', '').trim();
+        if (!current[`exp${optKey}`]) current[`exp${optKey}`] = expText;
+        // 檢查解釋中是否有答對標記
+        if (block.includes('答對了')) current.answer = optKey;
+        optKey = null;
+        continue;
+      }
+
+      // 否則可能是新的題目開始（有題號或較長的文句）
+      if (!block.match(/^[ABCD][.、．]/) && block.length > 5) {
+        // 如果有上一道題且四個選項齊全，存入
+        if (current && current.optA && current.optB && current.optC && current.optD) {
+          if (!current.answer) current.answer = 'A'; // 預設
+          results.push(current);
+        }
+        current = {
+          type: 'choice', text: block,
+          optA: '', expA: '', optB: '', expB: '',
+          optC: '', expC: '', optD: '', expD: '',
+          answer: ''
+        };
+        optKey = null;
+      }
+    }
+
+    // 最後一題
+    if (current && current.optA && current.optB && current.optC && current.optD) {
+      if (!current.answer) current.answer = 'A';
+      results.push(current);
+    }
+
+    return results;
+  }
+
+  async function confirmImport() {
+    if (!parsedQuestions.length) return;
+    const cls = document.getElementById('import-class').value;
+    const questions = parsedQuestions.map(q => ({ ...q, class: cls }));
+    loading(true);
+    try {
+      const r = await apiPost({ action: 'batchImport', questions });
+      if (r.success) {
+        showMsg('import-msg', `成功匯入 ${r.count} 道題目到「${cls}」！`, true);
+        document.getElementById('import-confirm-step').style.display = 'none';
+        document.getElementById('parse-preview').style.display = 'none';
+        document.getElementById('import-text').value = '';
+        parsedQuestions = [];
+        currentClass = cls;
+        loadList(cls);
+      } else {
+        showMsg('import-msg', '匯入失敗：' + (r.error || '未知錯誤'), false);
+      }
+    } catch(e) { showMsg('import-msg', '連線失敗，請稍後再試。', false); }
+    loading(false);
+  }
+
+  function cancelImport() {
+    parsedQuestions = [];
+    document.getElementById('import-confirm-step').style.display = 'none';
+    document.getElementById('parse-preview').style.display = 'none';
+  }
+
+  function showMsg(id, text, ok) {
+    const el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'msg ' + (ok ? 'ok' : 'err');
+  }
+</script>
+</body>
+</html>
