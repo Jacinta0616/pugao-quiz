@@ -126,25 +126,6 @@
     .option-group h4 { font-size: 14px; font-weight: 700; color: var(--orange); margin-bottom: 8px; }
     .form-actions { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
 
-    /* ── 批次匯入 ── */
-    .import-steps { counter-reset: step; }
-    .import-step {
-      background: var(--card); border-radius: var(--radius);
-      padding: 20px; box-shadow: var(--shadow); margin-bottom: 14px;
-      counter-increment: step;
-    }
-    .import-step h3::before {
-      content: counter(step) ". ";
-      color: var(--orange); font-weight: 700;
-    }
-    .import-step h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
-    .parse-preview {
-      background: var(--orange-pale); border-radius: 8px; padding: 12px; margin-top: 12px;
-      font-size: 13px; max-height: 200px; overflow-y: auto;
-    }
-    .parse-preview .parse-q { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #F0D8C0; }
-    .parse-preview .parse-q:last-child { border-bottom: none; margin-bottom: 0; }
-
     /* ── Loading overlay ── */
     #loading-overlay {
       display: none; position: fixed; inset: 0; background: rgba(255,255,255,.75);
@@ -186,7 +167,6 @@
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('tab-list')">📋 題庫管理</button>
     <button class="tab-btn" onclick="switchTab('tab-add')">➕ 新增題目</button>
-    <button class="tab-btn" onclick="switchTab('tab-import')">📥 批次匯入</button>
   </div>
 
   <!-- ═══ Tab 1：題庫管理 ═══ -->
@@ -266,46 +246,6 @@
     </div>
   </div>
 
-  <!-- ═══ Tab 3：批次匯入 ═══ -->
-  <div class="tab-panel" id="tab-import">
-    <div class="import-steps">
-      <div class="import-step">
-        <h3>從 NotebookLM 複製題目文字</h3>
-        <p style="font-size:14px;color:var(--text-sub);line-height:1.7;">
-          在 NotebookLM 測驗頁面，完成一輪測驗後，<br>
-          全選題目文字（包含選項和解釋），複製後貼到下方。
-        </p>
-      </div>
-
-      <div class="import-step">
-        <h3>貼上並解析</h3>
-        <label>選擇這批題目的班級</label>
-        <select id="import-class">
-          <option>初級班</option><option>中級班</option>
-          <option>高一班</option><option>高二班</option>
-          <option>研一班</option><option>研二班</option>
-          <option>研三班</option><option>研四班</option>
-        </select>
-        <label>貼上題目文字</label>
-        <textarea id="import-text" rows="10" placeholder="在此貼上從 NotebookLM 複製的文字…"></textarea>
-        <div style="margin-top:12px;">
-          <button class="btn btn-ghost" onclick="parseImport()">解析預覽</button>
-        </div>
-        <div class="parse-preview" id="parse-preview" style="display:none"></div>
-        <div class="msg" id="parse-msg"></div>
-      </div>
-
-      <div class="import-step" id="import-confirm-step" style="display:none">
-        <h3>確認匯入</h3>
-        <p style="font-size:14px;color:var(--text-sub);" id="parse-count-label"></p>
-        <div style="margin-top:12px;">
-          <button class="btn btn-primary" onclick="confirmImport()">確認匯入</button>
-          <button class="btn btn-ghost" style="margin-left:8px;" onclick="cancelImport()">取消</button>
-        </div>
-        <div class="msg" id="import-msg"></div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <script>
@@ -314,7 +254,6 @@
   const CLASSES = ['初級班','中級班','高一班','高二班','研一班','研二班','研三班','研四班'];
 
   let currentClass = CLASSES[0];
-  let parsedQuestions = [];
 
   // ── 登入 ──
   function login() {
@@ -332,7 +271,7 @@
   // ── Tab 切換 ──
   function switchTab(id) {
     document.querySelectorAll('.tab-btn').forEach((b,i) => {
-      b.classList.toggle('active', ['tab-list','tab-add','tab-import'][i] === id);
+      b.classList.toggle('active', ['tab-list','tab-add'][i] === id);
     });
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById(id).classList.add('active');
@@ -513,123 +452,6 @@
   function updateTypeHint() {
     const isFill = document.getElementById('f-type').value === 'fill';
     document.getElementById('type-hint').style.display = isFill ? 'block' : 'none';
-  }
-
-  // ── 批次匯入解析 ──
-  function parseImport() {
-    const text = document.getElementById('import-text').value.trim();
-    if (!text) { showMsg('parse-msg', '請先貼上題目文字。', false); return; }
-
-    parsedQuestions = parseNotebookLM(text);
-    const preview = document.getElementById('parse-preview');
-    const confirmStep = document.getElementById('import-confirm-step');
-    const msg = document.getElementById('parse-msg');
-
-    if (!parsedQuestions.length) {
-      preview.style.display = 'none';
-      confirmStep.style.display = 'none';
-      showMsg('parse-msg', '解析失敗，找不到符合格式的題目。請確認文字是否完整複製。', false);
-      return;
-    }
-
-    msg.className = 'msg';
-    preview.style.display = 'block';
-    preview.innerHTML = parsedQuestions.map((q, i) => `
-      <div class="parse-q">
-        <strong>第 ${i+1} 題（答案：${q.answer}）</strong><br>
-        ${q.text.slice(0, 60)}…<br>
-        <small style="color:var(--text-sub);">A: ${q.optA} ／ B: ${q.optB} ／ C: ${q.optC} ／ D: ${q.optD}</small>
-      </div>`).join('');
-
-    document.getElementById('parse-count-label').textContent =
-      `共解析出 ${parsedQuestions.length} 題，確認後匯入到「${document.getElementById('import-class').value}」。`;
-    confirmStep.style.display = 'block';
-  }
-
-  // NotebookLM 文字解析器
-  function parseNotebookLM(text) {
-    const results = [];
-    // 用空行分隔，找出每個題目區塊
-    const blocks = text.split(/\n{2,}/);
-    let current = null;
-    let optKey = null;
-
-    for (let i = 0; i < blocks.length; i++) {
-      const block = blocks[i].trim();
-      if (!block) continue;
-
-      // 嘗試判斷是否為選項行（A. B. C. D.）
-      const optMatch = block.match(/^([ABCD])[.、．]\s*(.+)/s);
-      if (optMatch && current) {
-        optKey = optMatch[1];
-        const optText = optMatch[2].replace('答對了！', '').trim();
-        current[`opt${optKey}`] = optText;
-        if (block.includes('答對了')) current.answer = optKey;
-        continue;
-      }
-
-      // 如果上一個 block 是選項，這個是解釋
-      if (optKey && current && !block.match(/^[ABCD][.、．]/)) {
-        const expText = block.replace('答對了！', '').trim();
-        if (!current[`exp${optKey}`]) current[`exp${optKey}`] = expText;
-        // 檢查解釋中是否有答對標記
-        if (block.includes('答對了')) current.answer = optKey;
-        optKey = null;
-        continue;
-      }
-
-      // 否則可能是新的題目開始（有題號或較長的文句）
-      if (!block.match(/^[ABCD][.、．]/) && block.length > 5) {
-        // 如果有上一道題且四個選項齊全，存入
-        if (current && current.optA && current.optB && current.optC && current.optD) {
-          if (!current.answer) current.answer = 'A'; // 預設
-          results.push(current);
-        }
-        current = {
-          type: 'choice', text: block,
-          optA: '', expA: '', optB: '', expB: '',
-          optC: '', expC: '', optD: '', expD: '',
-          answer: ''
-        };
-        optKey = null;
-      }
-    }
-
-    // 最後一題
-    if (current && current.optA && current.optB && current.optC && current.optD) {
-      if (!current.answer) current.answer = 'A';
-      results.push(current);
-    }
-
-    return results;
-  }
-
-  async function confirmImport() {
-    if (!parsedQuestions.length) return;
-    const cls = document.getElementById('import-class').value;
-    const questions = parsedQuestions.map(q => ({ ...q, class: cls }));
-    loading(true);
-    try {
-      const r = await apiPost({ action: 'batchImport', questions });
-      if (r.success) {
-        showMsg('import-msg', `成功匯入 ${r.count} 道題目到「${cls}」！`, true);
-        document.getElementById('import-confirm-step').style.display = 'none';
-        document.getElementById('parse-preview').style.display = 'none';
-        document.getElementById('import-text').value = '';
-        parsedQuestions = [];
-        currentClass = cls;
-        loadList(cls);
-      } else {
-        showMsg('import-msg', '匯入失敗：' + (r.error || '未知錯誤'), false);
-      }
-    } catch(e) { showMsg('import-msg', '連線失敗，請稍後再試。', false); }
-    loading(false);
-  }
-
-  function cancelImport() {
-    parsedQuestions = [];
-    document.getElementById('import-confirm-step').style.display = 'none';
-    document.getElementById('parse-preview').style.display = 'none';
   }
 
   function showMsg(id, text, ok) {
