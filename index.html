@@ -144,7 +144,6 @@
       background: var(--card); border-radius: var(--radius);
       padding: 40px 24px; text-align: center; box-shadow: var(--shadow); margin-top: 20px;
     }
-    .finish-icon { font-size: 56px; margin-bottom: 16px; }
     .finish-card h2 { font-size: 26px; color: var(--orange); margin-bottom: 10px; }
     .finish-card p  { font-size: 17px; color: var(--text-sub); line-height: 1.7; }
     .restart-btn {
@@ -152,6 +151,21 @@
       border-radius: 12px; padding: 16px 36px; font-size: 18px; font-weight: 700; cursor: pointer;
     }
     .restart-btn:hover { background: #C5540A; }
+
+    /* ── 貼圖裁切通用 ── */
+    /* 用背景定位裁出 4×4 貼圖表格中的單一貼圖 */
+    .sticker {
+      display: inline-block;
+      background-repeat: no-repeat;
+      flex-shrink: 0;
+    }
+    /* S__21209166.jpg：4×4 格，bg-size:400% 400% */
+    .stk-hello    { background-image:url('S__21209166.jpg'); background-size:400% 400%; background-position:  0%       0%; }
+    .stk-thinking { background-image:url('S__21209166.jpg'); background-size:400% 400%; background-position: 66.67%   0%; }
+    .stk-done     { background-image:url('S__21209166.jpg'); background-size:400% 400%; background-position:100%     100%; }
+    .stk-cheer    { background-image:url('S__21209166.jpg'); background-size:400% 400%; background-position: 33.33%  33.33%; }
+    /* S__21209169.jpg：哭臉 / 擔心 */
+    .stk-worry    { background-image:url('S__21209169.jpg'); background-size:400% 650%; background-position: 25%      55%; }
   </style>
 </head>
 <body>
@@ -165,7 +179,11 @@
 
 <!-- 班級選擇 -->
 <div class="screen active" id="screen-home">
-  <p class="section-title">請選擇您的班級</p>
+  <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin:8px 0 20px;">
+    <div class="sticker stk-hello" style="width:64px;height:64px;"></div>
+    <p style="font-size:20px;font-weight:700;color:var(--orange);">請選擇您的班級</p>
+    <div class="sticker stk-cheer" style="width:64px;height:64px;"></div>
+  </div>
   <div class="class-grid">
     <button class="class-btn" onclick="startQuiz('初級班')">初級班</button>
     <button class="class-btn" onclick="startQuiz('中級班')">中級班</button>
@@ -181,6 +199,7 @@
 <!-- 載入中 -->
 <div class="screen" id="screen-loading">
   <div class="loading-wrap">
+    <div class="sticker stk-thinking" style="width:90px;height:90px;margin:0 auto 16px;"></div>
     <div class="spinner"></div>
     <p class="loading-text">載入題目中…</p>
   </div>
@@ -189,7 +208,7 @@
 <!-- 錯誤 -->
 <div class="screen" id="screen-error">
   <div class="error-card">
-    <div class="error-icon">😔</div>
+    <div class="sticker stk-worry" style="width:90px;height:90px;margin:0 auto 12px;"></div>
     <p id="error-msg">載入失敗，請稍後再試。</p>
     <button class="back-btn" onclick="goHome()">返回</button>
   </div>
@@ -213,8 +232,8 @@
 <!-- 完成 -->
 <div class="screen" id="screen-finish">
   <div class="finish-card">
-    <div class="finish-icon">🎉</div>
-    <h2>完成！</h2>
+    <div class="sticker stk-done" style="width:130px;height:130px;margin:0 auto 16px;"></div>
+    <h2>大功告成！</h2>
     <p>您已完成本次複習，<br>隨喜法喜充滿！</p>
     <button class="restart-btn" onclick="goHome()">返回班級選擇</button>
   </div>
