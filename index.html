@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>普高精舍 複習答題</title>
+  <title>普高精舍 各級禪修學習系統</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -37,7 +37,15 @@
     .screen { display: none; padding: 24px 16px 40px; max-width: 480px; margin: 0 auto; }
     .screen.active { display: block; }
 
-    /* ── 班級選擇 ── */
+    /* ── 返回連結 ── */
+    .back-link {
+      display: inline-block; background: none; border: none;
+      color: var(--text-sub); font-size: 15px; cursor: pointer;
+      padding: 4px 0 12px; margin-bottom: 4px;
+    }
+    .back-link:hover { color: var(--orange); }
+
+    /* ── 班級 / 課程 / 題型選擇 ── */
     .section-title {
       font-size: 20px; font-weight: 700;
       text-align: center; margin: 8px 0 20px; color: var(--orange);
@@ -56,6 +64,31 @@
     .class-btn span {
       display: block; font-size: 13px; font-weight: 400; opacity: .7; margin-top: 4px;
     }
+
+    /* 題型選擇用單欄大按鈕 */
+    .type-grid { display: flex; flex-direction: column; gap: 14px; }
+    .type-btn {
+      background: var(--card); border: 2.5px solid var(--orange-light);
+      border-radius: var(--radius); padding: 20px 24px;
+      font-size: 20px; font-weight: 700; color: var(--orange);
+      cursor: pointer; text-align: center; box-shadow: var(--shadow);
+      transition: background .15s, color .15s, transform .1s;
+    }
+    .type-btn:hover, .type-btn:active {
+      background: var(--orange); color: #fff; transform: scale(1.03);
+    }
+    .type-btn span {
+      display: block; font-size: 14px; font-weight: 400; opacity: .7; margin-top: 4px;
+    }
+
+    /* 目前選擇的麵包屑提示 */
+    .breadcrumb {
+      font-size: 13px; color: var(--text-sub); text-align: center;
+      margin-bottom: 16px; background: var(--orange-pale);
+      border-radius: 99px; padding: 5px 16px; display: inline-block;
+      width: 100%; text-align: center;
+    }
+    .breadcrumb strong { color: var(--orange); }
 
     /* ── 載入中 ── */
     .loading-wrap {
@@ -106,10 +139,15 @@
       background: var(--card); border: 2px solid #E0C8A8; border-radius: 12px;
       padding: 14px 16px; font-size: 17px; font-weight: 500; color: var(--text);
       cursor: pointer; text-align: left; transition: background .15s, border-color .15s; width: 100%;
+      position: relative;
+    }
+    .opt-good-stk {
+      position: absolute; top: -22px; right: 6px;
+      width: 52px; height: 52px; object-fit: contain; pointer-events: none;
     }
     .option-btn:not(.disabled):hover { border-color: var(--orange); background: var(--orange-pale); }
-    .option-btn.correct  { background: var(--correct-bg); border-color: var(--correct); }
-    .option-btn.wrong    { background: var(--wrong-bg);   border-color: var(--wrong);   }
+    .option-btn.correct  { background: var(--correct-bg); border-color: var(--correct); border-width: 3px; }
+    .option-btn.wrong    { background: var(--wrong-bg);   border-color: var(--wrong);   border-width: 3px; }
     .option-btn.neutral  { background: var(--neutral-bg); border-color: #D5C8B8; }
     .option-btn.disabled { cursor: default; }
     .opt-main { display: flex; align-items: flex-start; gap: 8px; }
@@ -146,6 +184,14 @@
     }
     .finish-card h2 { font-size: 26px; color: var(--orange); margin-bottom: 10px; }
     .finish-card p  { font-size: 17px; color: var(--text-sub); line-height: 1.7; }
+    .score-box {
+      background: var(--orange-pale); border-radius: 14px;
+      padding: 20px 24px; margin: 20px 0;
+    }
+    .score-correct { font-size: 18px; color: var(--text-sub); margin-bottom: 10px; }
+    .score-correct strong { color: var(--text); font-size: 32px; font-weight: 700; }
+    .score-pct { font-size: 72px; font-weight: 700; color: var(--orange); line-height: 1; }
+    .score-pct span { font-size: 28px; font-weight: 600; }
     .restart-btn {
       margin-top: 28px; background: var(--orange); color: #fff; border: none;
       border-radius: 12px; padding: 16px 36px; font-size: 18px; font-weight: 700; cursor: pointer;
@@ -154,6 +200,22 @@
 
     /* ── 貼圖 ── */
     .sticker-img { object-fit: contain; display: block; flex-shrink: 0; }
+
+    /* ── 滿分慶祝覆蓋層 ── */
+    #celebrate-overlay {
+      display: none; position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,0.75);
+      align-items: center; justify-content: center; flex-direction: column;
+      cursor: pointer;
+    }
+    #celebrate-overlay.show { display: flex; }
+    #celebrate-overlay img {
+      width: 90vw; max-width: 420px;
+      border-radius: 20px;
+    }
+    #celebrate-overlay p {
+      color: #fff; font-size: 14px; margin-top: 14px; opacity: 0.7;
+    }
   </style>
 </head>
 <body>
@@ -161,8 +223,9 @@
 <header>
   <img src="資產 3_0.png" alt="普高精舍"
     style="width:64px;height:64px;border-radius:50%;object-fit:cover;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,0.18);" />
-  <h1>普高精舍　複習答題</h1>
-  <p>選擇班級，開始複習今日內容</p>
+  <h1>普高精舍　各級禪修學習系統</h1>
+  <p>背經即是念法；專注即是禪定。</p>
+  <p style="font-size:12px;opacity:0.75;margin-top:2px;">惟覺安公老和尚</p>
 </header>
 
 <!-- 班級選擇 -->
@@ -173,14 +236,43 @@
     <img src="stk-cheer.png" class="sticker-img" style="width:88px;height:88px;" alt="" />
   </div>
   <div class="class-grid">
-    <button class="class-btn" onclick="startQuiz('初級班')">初級班</button>
-    <button class="class-btn" onclick="startQuiz('中級班')">中級班</button>
-    <button class="class-btn" onclick="startQuiz('高一班')">高一班</button>
-    <button class="class-btn" onclick="startQuiz('高二班')">高二班</button>
-    <button class="class-btn" onclick="startQuiz('研一班')">研一班</button>
-    <button class="class-btn" onclick="startQuiz('研二班')">研二班</button>
-    <button class="class-btn" onclick="startQuiz('研三班')">研三班</button>
-    <button class="class-btn" onclick="startQuiz('研四班')">研四班</button>
+    <button class="class-btn" onclick="selectClass('初級班')">初級班</button>
+    <button class="class-btn" onclick="selectClass('中級班')">中級班</button>
+    <button class="class-btn" onclick="selectClass('高一班')">高一班</button>
+    <button class="class-btn" onclick="selectClass('高二班')">高二班</button>
+    <button class="class-btn" onclick="selectClass('研一班')">研一班</button>
+    <button class="class-btn" onclick="selectClass('研二班')">研二班</button>
+    <button class="class-btn" onclick="selectClass('研三班')">研三班</button>
+    <button class="class-btn" onclick="selectClass('研四班')">研四班</button>
+  </div>
+</div>
+
+<!-- 課程選擇 -->
+<div class="screen" id="screen-course">
+  <button class="back-link" onclick="goHome()">← 重新選班級</button>
+  <div class="breadcrumb" id="course-breadcrumb"></div>
+  <p class="section-title">請選擇課程</p>
+  <div class="class-grid" id="course-grid"></div>
+</div>
+
+<!-- 題型選擇 -->
+<div class="screen" id="screen-type">
+  <button class="back-link" onclick="showScreen('screen-course')">← 重新選課程</button>
+  <div class="breadcrumb" id="type-breadcrumb"></div>
+  <p class="section-title">請選擇題型</p>
+  <div class="type-grid">
+    <button class="type-btn" onclick="startQuiz('choice')">
+      選擇題
+      <span>從選項中選出正確答案</span>
+    </button>
+    <button class="type-btn" onclick="startQuiz('fill')">
+      填充題
+      <span>從選項中選出填入空格的字詞</span>
+    </button>
+    <button class="type-btn" onclick="startQuiz('all')">
+      全部混合
+      <span>選擇題與填充題一起練習</span>
+    </button>
   </div>
 </div>
 
@@ -222,16 +314,23 @@
   <div class="finish-card">
     <img src="stk-done.png" class="sticker-img" style="width:160px;height:160px;margin:0 auto 16px;" alt="" />
     <h2>大功告成！</h2>
-    <p>您已完成本次複習，<br>隨喜法喜充滿！</p>
+    <div class="score-box">
+      <div class="score-correct">答對題數：<strong id="finish-correct">0 / 0</strong></div>
+      <div class="score-pct" id="finish-score">0<span> 分</span></div>
+    </div>
+    <img src="stk-ending.png" class="sticker-img" style="width:160px;height:160px;margin:16px auto 0;" alt="" />
     <button class="restart-btn" onclick="goHome()">返回班級選擇</button>
   </div>
 </div>
 
 <script>
-  const API_URL = 'https://script.google.com/macros/s/AKfycbyeFWRmOrVbuQE6VN4deTLN_Dc6eLApF-ZJ1hFykgffSQxTkneD1gZ2diSiLUQLhIY7xw/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbzVIiJINvEA9l6BCD4_S9FO7lnqeN62y71X178xQr112mSbizjMyZb6L2UPItSut3yKng/exec';
   const LABELS = ['Ａ', 'Ｂ', 'Ｃ', 'Ｄ'];
   let questions = [];
   let currentQ = 0;
+  let correctCount = 0;
+  let selectedClass = '';
+  let selectedCourse = '';
 
   function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -243,6 +342,73 @@
   function showError(msg) {
     document.getElementById('error-msg').textContent = msg;
     showScreen('screen-error');
+  }
+
+  // ── 步驟 1：選班級 → 抓課程清單 ──
+  async function selectClass(className) {
+    selectedClass = className;
+    showScreen('screen-loading');
+    try {
+      const res = await fetch(`${API_URL}?action=getCourses&class=${encodeURIComponent(className)}`);
+      const data = await res.json();
+      if (data.success && data.courses && data.courses.length > 0) {
+        renderCourseScreen(data.courses);
+      } else {
+        showError('這個班級目前沒有課程題目，請聯繫管理員。');
+      }
+    } catch (e) {
+      showError('無法連接到題庫，請確認網路連線後再試。');
+    }
+  }
+
+  function renderCourseScreen(courses) {
+    document.getElementById('course-breadcrumb').innerHTML =
+      `班級：<strong>${selectedClass}</strong>`;
+
+    const grid = document.getElementById('course-grid');
+    grid.innerHTML = '';
+    courses.forEach(course => {
+      const btn = document.createElement('button');
+      btn.className = 'class-btn';
+      btn.textContent = course;
+      btn.onclick = () => selectCourse(course);
+      grid.appendChild(btn);
+    });
+    showScreen('screen-course');
+  }
+
+  // ── 步驟 2：選課程 → 顯示題型選擇 ──
+  function selectCourse(course) {
+    selectedCourse = course;
+    document.getElementById('type-breadcrumb').innerHTML =
+      `班級：<strong>${selectedClass}</strong>　課程：<strong>${selectedCourse}</strong>`;
+    showScreen('screen-type');
+  }
+
+  // ── 步驟 3：選題型 → 抓題目 → 開始答題 ──
+  async function startQuiz(type) {
+    showScreen('screen-loading');
+    try {
+      const params = new URLSearchParams({
+        action: 'getQuestions',
+        class: selectedClass,
+        course: selectedCourse,
+        type: type
+      });
+      const res = await fetch(`${API_URL}?${params}`);
+      const data = await res.json();
+      if (data.success && data.questions && data.questions.length > 0) {
+        questions = data.questions.map(apiToQuestion);
+        currentQ = 0;
+        correctCount = 0;
+        showScreen('screen-quiz');
+        renderQuestion();
+      } else {
+        showError('這個課程目前沒有符合的題目，請換一種題型或聯繫管理員。');
+      }
+    } catch (e) {
+      showError('無法連接到題庫，請確認網路連線後再試。');
+    }
   }
 
   // API 格式 → UI 格式
@@ -259,24 +425,6 @@
       ],
       answer: answerMap[String(q.answer).toUpperCase()] ?? 0
     };
-  }
-
-  async function startQuiz(className) {
-    showScreen('screen-loading');
-    try {
-      const res = await fetch(`${API_URL}?action=getQuestions&class=${encodeURIComponent(className)}`);
-      const data = await res.json();
-      if (data.success && data.questions && data.questions.length > 0) {
-        questions = data.questions.map(apiToQuestion);
-        currentQ = 0;
-        showScreen('screen-quiz');
-        renderQuestion();
-      } else {
-        showError('這個班級目前沒有題目，請聯繫管理員。');
-      }
-    } catch (e) {
-      showError('無法連接到題庫，請確認網路連線後再試。');
-    }
   }
 
   function renderQuestionText(text) {
@@ -330,20 +478,50 @@
   }
 
   function selectOption(idx, q) {
+    const isCorrect = idx === q.answer;
+    if (isCorrect) correctCount++;
     document.querySelectorAll('.option-btn').forEach((btn, i) => {
       btn.classList.add('disabled');
-      if (i === q.answer)      btn.classList.add('correct');
-      else if (i === idx)      btn.classList.add('wrong');
-      else                     btn.classList.add('neutral');
+      if (i === q.answer) {
+        btn.classList.add('correct');
+        if (isCorrect) {
+          const stk = document.createElement('img');
+          stk.src = 'stk-good.png';
+          stk.className = 'opt-good-stk';
+          stk.alt = '';
+          btn.appendChild(stk);
+        }
+      } else if (i === idx) {
+        btn.classList.add('wrong');
+      } else {
+        btn.classList.add('neutral');
+      }
     });
     document.getElementById('next-btn').className = 'next-btn show';
   }
 
   function nextQuestion() {
     currentQ++;
-    if (currentQ >= questions.length) showScreen('screen-finish');
+    if (currentQ >= questions.length) showFinish();
     else renderQuestion();
   }
+
+  function showFinish() {
+    const total = questions.length;
+    const score = Math.round((correctCount / total) * 100);
+    document.getElementById('finish-correct').textContent = `${correctCount} / ${total}`;
+    document.getElementById('finish-score').innerHTML = `${score}<span> 分</span>`;
+    showScreen('screen-finish');
+    if (score === 100) {
+      document.getElementById('celebrate-overlay').classList.add('show');
+    }
+  }
 </script>
+<!-- 滿分慶祝覆蓋層 -->
+<div id="celebrate-overlay" onclick="this.classList.remove('show')">
+  <img src="vdo-celebrate.svg" alt="恭喜滿分！" />
+  <p>點擊任意處關閉</p>
+</div>
+
 </body>
 </html>

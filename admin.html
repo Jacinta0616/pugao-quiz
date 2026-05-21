@@ -189,6 +189,9 @@
         <option>研三班</option><option>研四班</option>
       </select>
 
+      <label>課程</label>
+      <input type="text" id="f-course" placeholder="例如：第一課、阿彌陀經第三講…" />
+
       <label>題型</label>
       <select id="f-type" onchange="updateTypeHint()">
         <option value="choice">選擇題</option>
@@ -249,7 +252,7 @@
 </div>
 
 <script>
-  const API_URL = 'https://script.google.com/macros/s/AKfycbyeFWRmOrVbuQE6VN4deTLN_Dc6eLApF-ZJ1hFykgffSQxTkneD1gZ2diSiLUQLhIY7xw/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycbzVIiJINvEA9l6BCD4_S9FO7lnqeN62y71X178xQr112mSbizjMyZb6L2UPItSut3yKng/exec';
   const PASSWORD = 'pugao2026'; // 管理員密碼（可修改）
   const CLASSES = ['初級班','中級班','高一班','高二班','研一班','研二班','研三班','研四班'];
 
@@ -342,6 +345,7 @@
         <div class="q-body">
           <div class="q-meta">
             <span>${q.type === 'fill' ? '填充題' : '選擇題'}</span>
+            ${q.course ? `<span style="background:#E8F4EE;color:#2E8B57;">${q.course}</span>` : ''}
             答案：${q.answer}
           </div>
           <div class="q-text-preview">${String(q.text).slice(0,60)}${String(q.text).length > 60 ? '…' : ''}</div>
@@ -386,6 +390,7 @@
       document.getElementById('edit-id').value = q.id;
       document.getElementById('form-title').textContent = '編輯題目';
       document.getElementById('f-class').value = q.class;
+      document.getElementById('f-course').value = q.course || '';
       document.getElementById('f-type').value = q.type;
       document.getElementById('f-text').value = q.text;
       document.getElementById('f-optA').value = q.optA;
@@ -406,9 +411,10 @@
   // ── 表單送出 ──
   async function submitForm() {
     const q = {
-      class: document.getElementById('f-class').value,
-      type:  document.getElementById('f-type').value,
-      text:  document.getElementById('f-text').value.trim(),
+      class:  document.getElementById('f-class').value,
+      course: document.getElementById('f-course').value.trim(),
+      type:   document.getElementById('f-type').value,
+      text:   document.getElementById('f-text').value.trim(),
       optA:  document.getElementById('f-optA').value.trim(),
       expA:  document.getElementById('f-expA').value.trim(),
       optB:  document.getElementById('f-optB').value.trim(),
@@ -419,6 +425,9 @@
       expD:  document.getElementById('f-expD').value.trim(),
       answer: document.getElementById('f-answer').value,
     };
+    if (!q.course) {
+      showMsg('form-msg', '請填寫課程名稱。', false); return;
+    }
     if (!q.text || !q.optA || !q.optB || !q.optC || !q.optD) {
       showMsg('form-msg', '題目和四個選項文字都必須填寫。', false); return;
     }
@@ -443,7 +452,7 @@
   function clearForm() {
     document.getElementById('edit-id').value = '';
     document.getElementById('form-title').textContent = '新增題目';
-    ['f-text','f-optA','f-expA','f-optB','f-expB','f-optC','f-expC','f-optD','f-expD']
+    ['f-course','f-text','f-optA','f-expA','f-optB','f-expB','f-optC','f-expC','f-optD','f-expD']
       .forEach(id => document.getElementById(id).value = '');
     document.getElementById('f-answer').value = 'A';
     document.getElementById('form-msg').className = 'msg';
