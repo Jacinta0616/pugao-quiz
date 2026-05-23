@@ -4,6 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>普高精舍 各級禪修學習系統</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#E8640A" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="禪修學習" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -522,6 +529,12 @@
   <img src="vdo-celebrate.svg" alt="恭喜滿分！" />
   <p>點擊任意處關閉</p>
 </div>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
+</script>
 
 </body>
 </html>
