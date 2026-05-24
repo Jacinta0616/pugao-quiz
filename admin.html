@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>普高精舍 題庫管理</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -126,6 +127,23 @@
     .option-group h4 { font-size: 14px; font-weight: 700; color: var(--orange); margin-bottom: 8px; }
     .form-actions { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
 
+    /* ── 批次匯入 ── */
+    .import-section { background: var(--card); border-radius: var(--radius); padding: 24px 20px; box-shadow: var(--shadow); }
+    .import-section h3 { font-size: 18px; font-weight: 700; color: var(--orange); margin-bottom: 4px; }
+    .import-section .hint { font-size: 13px; color: var(--text-sub); margin-bottom: 16px; }
+    .file-drop {
+      border: 2.5px dashed var(--orange-light); border-radius: 10px;
+      padding: 28px 16px; text-align: center; cursor: pointer;
+      color: var(--text-sub); font-size: 15px; transition: background .15s, border-color .15s;
+    }
+    .file-drop:hover, .file-drop.drag-over { border-color: var(--orange); background: var(--orange-pale); }
+    .preview-item {
+      background: var(--orange-pale); border-radius: 8px;
+      padding: 10px 14px; margin-bottom: 8px;
+    }
+    .preview-q { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .preview-meta { font-size: 13px; color: var(--green); }
+
     /* ── Loading overlay ── */
     #loading-overlay {
       display: none; position: fixed; inset: 0; background: rgba(255,255,255,.75);
@@ -167,6 +185,7 @@
   <div class="tabs">
     <button class="tab-btn active" onclick="switchTab('tab-list')">📋 題庫管理</button>
     <button class="tab-btn" onclick="switchTab('tab-add')">➕ 新增題目</button>
+    <button class="tab-btn" onclick="switchTab('tab-import')">📥 批次匯入</button>
   </div>
 
   <!-- ═══ Tab 1：題庫管理 ═══ -->
@@ -249,10 +268,48 @@
     </div>
   </div>
 
+
+  <!-- ═══ Tab 3：批次匯入 ═══ -->
+  <div class="tab-panel" id="tab-import">
+    <div class="import-section">
+      <h3>從 NotebookLM 批次匯入</h3>
+      <p class="hint">支援 NotebookLM 下載的 .docx 測驗格式，解析後預覽確認再匯入。</p>
+
+      <label>班級</label>
+      <select id="imp-class">
+        <option>初級班</option><option>中級班</option>
+        <option>高一班</option><option>高二班</option>
+        <option>研一班</option><option>研二班</option>
+        <option>研三班</option><option>研四班</option>
+      </select>
+
+      <label>課程名稱</label>
+      <input type="text" id="imp-course" placeholder="例如：第四課、中台四箴行…" />
+
+      <label style="margin-top:16px;">上傳 .docx 檔案</label>
+      <div class="file-drop" id="file-drop-zone"
+        onclick="document.getElementById('docx-file-input').click()"
+        ondragover="event.preventDefault();this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="event.preventDefault();this.classList.remove('drag-over');handleDocxFile(event.dataTransfer.files[0])">
+        點擊選擇 .docx 檔案，或直接拖曳到這裡
+        <input type="file" id="docx-file-input" accept=".docx" style="display:none"
+          onchange="handleDocxFile(this.files[0])" />
+      </div>
+
+      <div id="import-status" style="font-size:14px;color:var(--text-sub);margin-top:10px;"></div>
+      <div id="import-preview" style="margin-top:12px;"></div>
+      <div id="import-actions" style="display:none;margin-top:16px;">
+        <button class="btn btn-primary" onclick="confirmImport()">確認匯入（共 <span id="imp-count">0</span> 題）</button>
+      </div>
+      <div class="msg" id="import-msg"></div>
+    </div>
+  </div>
+
 </div>
 
 <script>
-  const API_URL = 'https://script.google.com/macros/s/AKfycby3TdDXGO91drGoye7PO0VaAZwjocE_TB5MeLq-Z_WbR322wwqlNZcO9wHuJoj9TEGk_Q/exec';
+  const API_URL = 'https://script.google.com/macros/s/AKfycby4qYsswrwNsDDAzYR7wgN-EaSWNIPpRtChDDgvFDgW36W7faNdgDatFRMbb4tDdQAcvQ/exec';
   const PASSWORD = 'pugao2026'; // 管理員密碼（可修改）
   const CLASSES = ['初級班','中級班','高一班','高二班','研一班','研二班','研三班','研四班'];
 
@@ -273,8 +330,9 @@
 
   // ── Tab 切換 ──
   function switchTab(id) {
-    document.querySelectorAll('.tab-btn').forEach((b,i) => {
-      b.classList.toggle('active', ['tab-list','tab-add'][i] === id);
+    const tabIds = ['tab-list', 'tab-add', 'tab-import'];
+    document.querySelectorAll('.tab-btn').forEach((b, i) => {
+      b.classList.toggle('active', tabIds[i] === id);
     });
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById(id).classList.add('active');
@@ -467,6 +525,160 @@
     const el = document.getElementById(id);
     el.textContent = text;
     el.className = 'msg ' + (ok ? 'ok' : 'err');
+  }
+
+  // ════════════════════════════════════════
+  //  批次匯入 — NotebookLM .docx 解析
+  // ════════════════════════════════════════
+  let parsedImportQuestions = [];
+
+  async function handleDocxFile(file) {
+    if (!file || !file.name.endsWith('.docx')) {
+      document.getElementById('import-status').textContent = '請選擇 .docx 格式的檔案。';
+      return;
+    }
+    const course = document.getElementById('imp-course').value.trim();
+    if (!course) {
+      document.getElementById('import-status').textContent = '請先填寫課程名稱，再上傳檔案。';
+      return;
+    }
+    document.getElementById('import-status').textContent = '解析中…';
+    document.getElementById('import-preview').innerHTML = '';
+    document.getElementById('import-actions').style.display = 'none';
+
+    try {
+      const lines = await extractDocxLines(file);
+      const className = document.getElementById('imp-class').value;
+      parsedImportQuestions = parseNotebookLM(lines, className, course);
+      renderImportPreview(parsedImportQuestions);
+    } catch (e) {
+      document.getElementById('import-status').textContent = '解析失敗：' + e.message;
+    }
+  }
+
+  async function extractDocxLines(file) {
+    const buf = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(buf);
+    const xmlStr = await zip.file('word/document.xml').async('string');
+    const doc = new DOMParser().parseFromString(xmlStr, 'application/xml');
+    const ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    const paras = doc.getElementsByTagNameNS(ns, 'p');
+    const lines = [];
+    for (const p of paras) {
+      const runs = p.getElementsByTagNameNS(ns, 't');
+      let text = '';
+      for (const r of runs) text += r.textContent;
+      if (text.trim()) lines.push(text.trim());
+    }
+    return lines;
+  }
+
+  function parseNotebookLM(lines, className, course) {
+    const questions = [];
+    let i = 0;
+    // 跳過標題列
+    while (i < lines.length && !lines[i].match(/^\d+\./)) i++;
+
+    while (i < lines.length) {
+      const qMatch = lines[i].match(/^(\d+)\.\s*(.+)/);
+      if (!qMatch) { i++; continue; }
+
+      const rawQ = qMatch[2];
+      const questionText = rawQ.replace(/____+/g, '[空]');
+      const type = rawQ.includes('___') ? 'fill' : 'choice';
+      i++;
+
+      if (i >= lines.length) break;
+      const optLine = lines[i]; i++;
+
+      // 解析選項：(A) 文字 (B) 文字...
+      const opts = {};
+      const optRe = /\(([ABCD])\)\s*([^(]+)/g;
+      let om;
+      while ((om = optRe.exec(optLine)) !== null) {
+        opts[om[1]] = om[2].trim();
+      }
+
+      // 跳過【選項解析】
+      if (i < lines.length && lines[i].includes('選項解析')) i++;
+
+      // 解析解釋（支援 (A, B, C) 錯誤：… 的合併格式）
+      const exps = { A: '', B: '', C: '', D: '' };
+      let answer = '';
+      let expCount = 0;
+      while (i < lines.length && expCount < 4) {
+        const expMatch = lines[i].match(/^\(([ABCD,\s，、]+)\)\s*(正確|錯誤)[：:]\s*(.+)/);
+        if (!expMatch) break;
+        i++;
+        const letters = expMatch[1].split(/[,，、\s]+/).filter(l => /^[ABCD]$/.test(l));
+        const isCorrect = expMatch[2] === '正確';
+        const expText = expMatch[3].trim();
+        letters.forEach(l => {
+          exps[l] = expText;
+          if (isCorrect && !answer) answer = l;
+        });
+        expCount += letters.length;
+      }
+
+      if (opts.A && opts.B && opts.C && opts.D) {
+        questions.push({
+          class: className, course, type,
+          text: questionText,
+          optA: opts.A, expA: exps.A,
+          optB: opts.B, expB: exps.B,
+          optC: opts.C, expC: exps.C,
+          optD: opts.D, expD: exps.D,
+          answer: answer || 'A'
+        });
+      }
+    }
+    return questions;
+  }
+
+  function renderImportPreview(qs) {
+    const status  = document.getElementById('import-status');
+    const preview = document.getElementById('import-preview');
+    const actions = document.getElementById('import-actions');
+
+    if (!qs.length) {
+      status.textContent = '找不到可解析的題目，請確認檔案是否為 NotebookLM 下載的測驗格式。';
+      preview.innerHTML = '';
+      actions.style.display = 'none';
+      return;
+    }
+
+    status.textContent = `已解析 ${qs.length} 道題目，確認無誤後按下方按鈕匯入：`;
+    document.getElementById('imp-count').textContent = qs.length;
+    actions.style.display = 'block';
+
+    preview.innerHTML = qs.map((q, idx) => `
+      <div class="preview-item">
+        <div class="preview-q">${idx + 1}. ${q.text.slice(0, 70)}${q.text.length > 70 ? '…' : ''}</div>
+        <div class="preview-meta">答案：${q.answer}　${q.type === 'fill' ? '【填充題】' : '【選擇題】'}　課程：${q.course}</div>
+      </div>`).join('');
+  }
+
+  async function confirmImport() {
+    if (!parsedImportQuestions.length) return;
+    loading(true);
+    try {
+      const r = await apiPost({ action: 'batchImport', questions: parsedImportQuestions });
+      if (r.success) {
+        showMsg('import-msg', `成功匯入 ${r.count} 道題目！`, true);
+        document.getElementById('import-preview').innerHTML = '';
+        document.getElementById('import-actions').style.display = 'none';
+        document.getElementById('import-status').textContent = '';
+        document.getElementById('docx-file-input').value = '';
+        parsedImportQuestions = [];
+        currentClass = document.getElementById('imp-class').value;
+        loadList(currentClass);
+      } else {
+        showMsg('import-msg', '匯入失敗：' + (r.error || '未知錯誤'), false);
+      }
+    } catch (e) {
+      showMsg('import-msg', '連線失敗，請稍後再試。', false);
+    }
+    loading(false);
   }
 </script>
 </body>
