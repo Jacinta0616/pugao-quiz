@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pugao-quiz-v1';
+const CACHE_NAME = 'pugao-quiz-v2';
 const STATIC_FILES = [
   '/pugao-quiz/',
   '/pugao-quiz/index.html',
@@ -11,7 +11,7 @@ const STATIC_FILES = [
   '/pugao-quiz/stk-done.png',
   '/pugao-quiz/stk-good.png',
   '/pugao-quiz/stk-ending.png',
-  '/pugao-quiz/vdo-celebrate.svg',
+  '/pugao-quiz/perfect_icon.png',
 ];
 
 // 安裝：預先快取所有靜態檔案
