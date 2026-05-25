@@ -358,9 +358,18 @@
     }
   }
 
+  const ZH_NUM = {'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,
+                  '十':10,'十一':11,'十二':12,'十三':13,'十四':14,'十五':15,'十六':16};
+  function courseOrder(name) {
+    const m = name.match(/第([一二三四五六七八九十]+)課/);
+    return m ? (ZH_NUM[m[1]] ?? 999) : 999;
+  }
+
   function renderCourseScreen(courses) {
     document.getElementById('course-breadcrumb').innerHTML =
       `班級：<strong>${selectedClass}</strong>`;
+
+    courses.sort((a, b) => courseOrder(a) - courseOrder(b));
 
     const grid = document.getElementById('course-grid');
     grid.innerHTML = '';
