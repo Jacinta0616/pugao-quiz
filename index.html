@@ -208,6 +208,26 @@
     /* ── 貼圖 ── */
     .sticker-img { object-fit: contain; display: block; flex-shrink: 0; }
 
+    /* ── 滿分圖示 ── */
+    #perfect-icon-wrap {
+      display: none; position: fixed;
+      top: 32%; left: 50%; transform: translate(-50%, -50%);
+      z-index: 9999; pointer-events: none;
+    }
+    #perfect-icon-wrap.show { display: block; }
+    #perfect-icon-wrap img {
+      width: 180px; height: 180px; object-fit: contain;
+      animation: perfectSpin 8s ease-out forwards;
+    }
+    @keyframes perfectSpin {
+      0%   { opacity: 0; transform: rotate(0deg) scale(0.2); }
+      5%   { opacity: 1; }
+      25%  { transform: rotate(1080deg) scale(1.05); opacity: 1; }
+      30%  { transform: rotate(1080deg) scale(1);    opacity: 1; }
+      87%  { transform: rotate(1080deg) scale(1);    opacity: 1; }
+      100% { transform: rotate(1080deg) scale(0.8);  opacity: 0; }
+    }
+
     /* ── 煙火 canvas ── */
     #fireworks-canvas {
       display: none; position: fixed; inset: 0; z-index: 9998;
@@ -518,9 +538,28 @@
     document.getElementById('finish-correct').textContent = `${correctCount} / ${total}`;
     document.getElementById('finish-score').innerHTML = `${score}<span> 分</span>`;
     showScreen('screen-finish');
-    if (score === 100) startFireworks();
+    if (score === 100) { startFireworks(); showPerfectIcon(); }
+  }
+
+  function showPerfectIcon() {
+    const wrap = document.getElementById('perfect-icon-wrap');
+    const img  = wrap.querySelector('img');
+    // 重置動畫（若重複觸發）
+    img.style.animation = 'none';
+    wrap.classList.remove('show');
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        img.style.animation = '';
+        wrap.classList.add('show');
+        setTimeout(() => wrap.classList.remove('show'), 8100);
+      });
+    });
   }
 </script>
+<div id="perfect-icon-wrap">
+  <img src="perfect_icon.jpg" alt="" />
+</div>
+
 <canvas id="fireworks-canvas"></canvas>
 
 <script>
