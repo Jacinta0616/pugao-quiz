@@ -574,50 +574,70 @@
   }
 
   function parseNotebookLM(lines, className, course) {
+    // 支援兩種 NotebookLM .docx 格式：
+    // 格式A：題目、選項、解析各自一行（舊格式）
+    // 格式B：整題全部擠在同一行，解析後帶引用編號如 " 1." " 1, 2."（新格式）
     const questions = [];
-    let i = 0;
-    // 跳過標題列
-    while (i < lines.length && !lines[i].match(/^\d+\./)) i++;
+    const fullText = lines.join('\n');
 
-    while (i < lines.length) {
-      const qMatch = lines[i].match(/^(\d+)\.\s*(.+)/);
-      if (!qMatch) { i++; continue; }
+    // 以題號為界切割題目區塊（"\n1. " "\n2. " …）
+    const rawBlocks = fullText.split(/\n(?=\d+\.\s)/);
 
-      const rawQ = qMatch[2];
-      const questionText = rawQ.replace(/____+/g, '[空]');
+    for (const block of rawBlocks) {
+      const qMatch = block.match(/^(\d+)\.\s*([\s\S]+)/);
+      if (!qMatch) continue;
+
+      const content = qMatch[2].trim();
+
+      // 找第一個 (A) 的位置，之前是題目文字
+      const optIdx = content.indexOf('(A)');
+      if (optIdx === -1) continue;
+
+      const rawQ = content.substring(0, optIdx).replace(/\n/g, ' ').trim();
       const type = rawQ.includes('___') ? 'fill' : 'choice';
-      i++;
+      const questionText = rawQ.replace(/____+/g, '[空]');
 
-      if (i >= lines.length) break;
-      const optLine = lines[i]; i++;
+      const afterQ = content.substring(optIdx);
 
-      // 解析選項：(A) 文字 (B) 文字...
+      // 切分選項區 / 解析區
+      let optsPart, expPart;
+      const expMarkerIdx = afterQ.indexOf('【選項解析】');
+      if (expMarkerIdx !== -1) {
+        optsPart = afterQ.substring(0, expMarkerIdx);
+        expPart  = afterQ.substring(expMarkerIdx + '【選項解析】'.length);
+      } else {
+        optsPart = afterQ;
+        expPart  = '';
+      }
+
+      // 解析選項：(A) 文字 到下一個 ( 或 【 或換行為止
       const opts = {};
-      const optRe = /\(([ABCD])\)\s*([^(]+)/g;
+      const optRe = /\(([ABCD])\)\s*([^(【\n]+)/g;
       let om;
-      while ((om = optRe.exec(optLine)) !== null) {
+      while ((om = optRe.exec(optsPart)) !== null) {
         opts[om[1]] = om[2].trim();
       }
 
-      // 跳過【選項解析】
-      if (i < lines.length && lines[i].includes('選項解析')) i++;
-
-      // 解析解釋（支援 (A, B, C) 錯誤：… 的合併格式）
+      // 解析解釋
       const exps = { A: '', B: '', C: '', D: '' };
       let answer = '';
-      let expCount = 0;
-      while (i < lines.length && expCount < 4) {
-        const expMatch = lines[i].match(/^\(([ABCD,\s，、]+)\)\s*(正確|錯誤)[：:]\s*(.+)/);
-        if (!expMatch) break;
-        i++;
-        const letters = expMatch[1].split(/[,，、\s]+/).filter(l => /^[ABCD]$/.test(l));
-        const isCorrect = expMatch[2] === '正確';
-        const expText = expMatch[3].trim();
-        letters.forEach(l => {
-          exps[l] = expText;
-          if (isCorrect && !answer) answer = l;
-        });
-        expCount += letters.length;
+
+      if (expPart) {
+        // 以 (X) 正確/錯誤： 為界切成各別說明區塊
+        const expBlocks = expPart.split(/(?=\([ABCD,\s，、]+\)\s*(?:正確|錯誤)[：:])/);
+        for (const eb of expBlocks) {
+          // 只取到換行前（避免把下一題的内容帶進來）
+          const em = eb.match(/^\(([ABCD,\s，、]+)\)\s*(正確|錯誤)[：:]\s*([^\n]+)/);
+          if (!em) continue;
+          const letters = em[1].split(/[,，、\s]+/).filter(l => /^[ABCD]$/.test(l));
+          const isCorrect = em[2] === '正確';
+          // 去除尾端引用編號，如 " 1." " 1, 11。" " 1, 3."
+          const expText = em[3].trim().replace(/\s+\d+(?:[,，]\s*\d+)*[.。]?\s*$/, '').trim();
+          letters.forEach(l => {
+            exps[l] = expText;
+            if (isCorrect && !answer) answer = l;
+          });
+        }
       }
 
       if (opts.A && opts.B && opts.C && opts.D) {
