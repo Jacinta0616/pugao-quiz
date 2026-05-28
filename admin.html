@@ -574,10 +574,11 @@
   }
 
   function parseNotebookLM(lines, className, course) {
-    // 支援三種 NotebookLM .docx 格式：
+    // 支援四種 NotebookLM .docx 格式：
     // 格式A：題目、選項、解析各自一行；解析為 (X) 正確/錯誤：text
     // 格式B：整題全部擠在同一行；解析為 (X) 正確/錯誤：text + 引用編號
-    // 格式C：題目/選項各自一行；解析為 正確答案：(X)。text（如四十二章經）
+    // 格式C：各自一行；解析標記【解析】，寫法 正確答案：(X)。text（四十二章經）
+    // 格式D：題目+選項同行；解析標記【詳細解析】，寫法 正確答案為 (X)。text（第十五章）
     const questions = [];
     const fullText = lines.join('\n');
 
@@ -600,9 +601,9 @@
 
       const afterQ = content.substring(optIdx);
 
-      // 切分選項區 / 解析區（支援 【選項解析】 和 【解析】）
+      // 切分選項區 / 解析區（支援多種標記）
       let optsPart = afterQ, expPart = '';
-      for (const marker of ['【選項解析】', '【解析】']) {
+      for (const marker of ['【選項解析】', '【詳細解析】', '【解析】']) {
         const idx = afterQ.indexOf(marker);
         if (idx !== -1) {
           optsPart = afterQ.substring(0, idx);
@@ -643,7 +644,7 @@
 
         // 格式C：正確答案：(X)。說明文字
         if (!foundPerOption) {
-          const ansMatch = expPart.match(/正確答案[：:]\s*\(([ABCD])\)[。.]\s*([^\n]+)/);
+          const ansMatch = expPart.match(/正確答案[為：:]\s*\(([ABCD])\)[。.]\s*([^\n]+)/);
           if (ansMatch) {
             answer = ansMatch[1];
             const expText = ansMatch[2].trim().replace(/\s+\d+(?:[-,，]\s*\d+)*[.。]?\s*$/, '').trim();
