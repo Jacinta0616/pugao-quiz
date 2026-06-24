@@ -574,23 +574,26 @@
   }
 
   function parseNotebookLM(lines, className, course) {
-    // 支援四種 NotebookLM .docx 格式：
+    // 支援多種 NotebookLM .docx 格式（有題號 / 無題號皆可）：
     // 格式A：題目、選項、解析各自一行；解析為 (X) 正確/錯誤：text
     // 格式B：整題全部擠在同一行；解析為 (X) 正確/錯誤：text + 引用編號
-    // 格式C：各自一行；解析標記【解析】，寫法 正確答案：(X)。text（四十二章經）
-    // 格式D：題目+選項同行；解析標記【詳細解析】，寫法 正確答案為 (X)。text（第十五章）
+    // 格式C/D/E：解析標記【解析】/【詳細解析】，寫法 正確答案[為：] (X) [選項文字]。text
+    // 格式F：無題號，每行就是一題（含 (A) 的行直接解析）
     const questions = [];
     const fullText = lines.join('\n');
 
-    // 以題號為界切割題目區塊（"\n1. " "\n2. " …）
-    const rawBlocks = fullText.split(/\n(?=\d+\.\s)/);
+    // 判斷有無題號；無題號時每個含 (A) 的行就是一題
+    let contentBlocks;
+    if (/^\d+\.\s/m.test(fullText)) {
+      contentBlocks = fullText.split(/\n(?=\d+\.\s)/).map(b => {
+        const m = b.match(/^\d+\.\s*([\s\S]+)/);
+        return m ? m[1].trim() : null;
+      }).filter(Boolean);
+    } else {
+      contentBlocks = lines.filter(l => l.includes('(A)'));
+    }
 
-    for (const block of rawBlocks) {
-      const qMatch = block.match(/^(\d+)\.\s*([\s\S]+)/);
-      if (!qMatch) continue;
-
-      const content = qMatch[2].trim();
-
+    for (const content of contentBlocks) {
       // 找第一個 (A) 的位置，之前是題目文字
       const optIdx = content.indexOf('(A)');
       if (optIdx === -1) continue;
@@ -642,13 +645,21 @@
           });
         }
 
-        // 格式C：正確答案：(X)。說明文字
+        // 格式C/D/E：正確答案[為：:] (X) [選項文字]。說明文字
+        // 相容三種寫法：正確答案：(B)。說明 / 正確答案為 (B)。說明 / 正確答案為 (B) 寂靜。說明
         if (!foundPerOption) {
-          const ansMatch = expPart.match(/正確答案[為：:]\s*\(([ABCD])\)[。.]\s*([^\n]+)/);
+          const ansMatch = expPart.match(/正確答案[為：:]\s*\(([ABCD])\)/);
           if (ansMatch) {
             answer = ansMatch[1];
-            const expText = ansMatch[2].trim().replace(/\s+\d+(?:[-,，]\s*\d+)*[.。]?\s*$/, '').trim();
-            exps[answer] = expText;
+            // 取第一個句號之後的文字作為解釋
+            const firstPeriod = expPart.search(/[。.]/);
+            if (firstPeriod !== -1) {
+              const expText = expPart.substring(firstPeriod + 1).trim()
+                .replace(/\s+\d+(?:[-,，]\s*\d+)*[.。]?\s*$/, '')
+                .replace(/\s*[a-z]$/, '')  // 清除字母型引用標記如 i
+                .trim();
+              exps[answer] = expText;
+            }
           }
         }
       }
