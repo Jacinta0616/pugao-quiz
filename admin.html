@@ -314,6 +314,7 @@
   const CLASSES = ['初級班','中級班','高一班','高二班','研一班','研二班','研三班','研四班'];
 
   let currentClass = CLASSES[0];
+  let cachedQuestions = []; // 本地快取，避免重複打 API
 
   // ── 登入 ──
   function login() {
@@ -383,7 +384,8 @@
     loading(true);
     try {
       const data = await apiGet({ action: 'getAll', class: cls });
-      renderList(data.questions || []);
+      cachedQuestions = data.questions || [];
+      renderList(cachedQuestions);
     } catch(e) {
       document.getElementById('q-list-wrap').innerHTML =
         '<p class="empty-state">載入失敗，請確認網路連線。</p>';
@@ -391,13 +393,8 @@
     loading(false);
   }
 
-  function renderList(qs) {
-    const wrap = document.getElementById('q-list-wrap');
-    if (!qs.length) {
-      wrap.innerHTML = '<p class="empty-state">這個班級還沒有題目，請從「新增題目」開始。</p>';
-      return;
-    }
-    wrap.innerHTML = '<div class="q-list">' + qs.map(q => `
+  function makeCardHTML(q) {
+    return `
       <div class="q-card ${q.enabled ? '' : 'disabled-q'}" id="qc-${q.id}">
         <button class="q-toggle ${q.enabled ? 'on' : ''}" onclick="toggle(${q.id})" title="${q.enabled ? '停用' : '啟用'}"></button>
         <div class="q-body">
@@ -412,58 +409,88 @@
             <button class="btn btn-danger" onclick="deleteQ(${q.id})">🗑️ 刪除</button>
           </div>
         </div>
-      </div>`).join('') + '</div>';
+      </div>`;
   }
 
-  // ── 啟用 / 停用 ──
+  function renderList(qs) {
+    const wrap = document.getElementById('q-list-wrap');
+    if (!qs.length) {
+      wrap.innerHTML = '<p class="empty-state">這個班級還沒有題目，請從「新增題目」開始。</p>';
+      return;
+    }
+    wrap.innerHTML = '<div class="q-list">' + qs.map(makeCardHTML).join('') + '</div>';
+  }
+
+  // ── 啟用 / 停用（直接更新 DOM，不重新載入整份清單）──
   async function toggle(id) {
     loading(true);
     try {
       const r = await apiPost({ action: 'toggleEnable', id });
-      if (r.success) loadList(currentClass);
+      if (r.success) {
+        const q = cachedQuestions.find(x => String(x.id) === String(id));
+        if (q) q.enabled = r.enabled;
+        const card = document.getElementById('qc-' + id);
+        if (card) {
+          card.classList.toggle('disabled-q', !r.enabled);
+          const btn = card.querySelector('.q-toggle');
+          if (btn) { btn.classList.toggle('on', r.enabled); btn.title = r.enabled ? '停用' : '啟用'; }
+        }
+      }
     } catch(e) { alert('操作失敗'); }
     loading(false);
   }
 
-  // ── 刪除 ──
+  // ── 刪除（直接移除卡片，不重新載入整份清單）──
   async function deleteQ(id) {
     if (!confirm('確定要刪除這道題目嗎？')) return;
     loading(true);
     try {
       const r = await apiPost({ action: 'deleteQuestion', id });
-      if (r.success) loadList(currentClass);
-      else alert('刪除失敗：' + r.error);
+      if (r.success) {
+        cachedQuestions = cachedQuestions.filter(x => String(x.id) !== String(id));
+        const card = document.getElementById('qc-' + id);
+        if (card) card.remove();
+        if (!cachedQuestions.length) {
+          document.getElementById('q-list-wrap').innerHTML =
+            '<p class="empty-state">這個班級還沒有題目，請從「新增題目」開始。</p>';
+        }
+      } else alert('刪除失敗：' + r.error);
     } catch(e) { alert('操作失敗'); }
     loading(false);
   }
 
-  // ── 編輯（載入到表單）──
+  // ── 編輯（從記憶體快取取題目，不打 API）──
   async function editQ(id) {
-    loading(true);
-    try {
-      const data = await apiGet({ action: 'getAll', class: currentClass });
-      const q = (data.questions || []).find(x => String(x.id) === String(id));
-      if (!q) { alert('找不到題目'); loading(false); return; }
+    let q = cachedQuestions.find(x => String(x.id) === String(id));
+    if (!q) {
+      // 快取沒有時才回退到 API（極少發生）
+      loading(true);
+      try {
+        const data = await apiGet({ action: 'getAll', class: currentClass });
+        cachedQuestions = data.questions || [];
+        q = cachedQuestions.find(x => String(x.id) === String(id));
+      } catch(e) { alert('載入失敗'); loading(false); return; }
+      loading(false);
+    }
+    if (!q) { alert('找不到題目'); return; }
 
-      document.getElementById('edit-id').value = q.id;
-      document.getElementById('form-title').textContent = '編輯題目';
-      document.getElementById('f-class').value = q.class;
-      document.getElementById('f-course').value = q.course || '';
-      document.getElementById('f-type').value = q.type;
-      document.getElementById('f-text').value = q.text;
-      document.getElementById('f-optA').value = q.optA;
-      document.getElementById('f-expA').value = q.expA;
-      document.getElementById('f-optB').value = q.optB;
-      document.getElementById('f-expB').value = q.expB;
-      document.getElementById('f-optC').value = q.optC;
-      document.getElementById('f-expC').value = q.expC;
-      document.getElementById('f-optD').value = q.optD;
-      document.getElementById('f-expD').value = q.expD;
-      document.getElementById('f-answer').value = q.answer;
-      updateTypeHint();
-      switchTab('tab-add');
-    } catch(e) { alert('載入失敗'); }
-    loading(false);
+    document.getElementById('edit-id').value = q.id;
+    document.getElementById('form-title').textContent = '編輯題目';
+    document.getElementById('f-class').value = q.class;
+    document.getElementById('f-course').value = q.course || '';
+    document.getElementById('f-type').value = q.type;
+    document.getElementById('f-text').value = q.text;
+    document.getElementById('f-optA').value = q.optA;
+    document.getElementById('f-expA').value = q.expA;
+    document.getElementById('f-optB').value = q.optB;
+    document.getElementById('f-expB').value = q.expB;
+    document.getElementById('f-optC').value = q.optC;
+    document.getElementById('f-expC').value = q.expC;
+    document.getElementById('f-optD').value = q.optD;
+    document.getElementById('f-expD').value = q.expD;
+    document.getElementById('f-answer').value = q.answer;
+    updateTypeHint();
+    switchTab('tab-add');
   }
 
   // ── 表單送出 ──
@@ -498,8 +525,30 @@
       if (r.success) {
         showMsg('form-msg', editId ? '題目已更新！' : '題目已新增！', true);
         clearForm();
-        currentClass = q.class;
-        loadList(currentClass);
+        if (q.class === currentClass) {
+          if (editId) {
+            // 更新：原地替換卡片 + 更新快取
+            const idx = cachedQuestions.findIndex(x => String(x.id) === String(editId));
+            if (idx !== -1) {
+              const updated = Object.assign({}, cachedQuestions[idx], q);
+              cachedQuestions[idx] = updated;
+              const card = document.getElementById('qc-' + editId);
+              if (card) { const tmp = document.createElement('div'); tmp.innerHTML = makeCardHTML(updated); card.replaceWith(tmp.firstElementChild); }
+            }
+          } else {
+            // 新增：插入新卡片 + 加入快取
+            const newQ = Object.assign({}, q, { id: r.id, enabled: true });
+            cachedQuestions.push(newQ);
+            const wrap = document.getElementById('q-list-wrap');
+            let list = wrap.querySelector('.q-list');
+            if (!list) { wrap.innerHTML = '<div class="q-list"></div>'; list = wrap.querySelector('.q-list'); }
+            list.insertAdjacentHTML('beforeend', makeCardHTML(newQ));
+          }
+        } else {
+          // 跨班新增時才需重新載入
+          currentClass = q.class;
+          loadList(currentClass);
+        }
       } else {
         showMsg('form-msg', '儲存失敗：' + (r.error || '未知錯誤'), false);
       }
