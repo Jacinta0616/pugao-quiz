@@ -351,6 +351,8 @@
   let correctCount = 0;
   let selectedClass = '';
   let selectedCourse = '';
+  const courseCache = {};    // 班級 → 課程清單（避免重複呼叫 getCourses）
+  let prefetchPromise = null; // 選課程後在背景預載題目
 
   function showScreen(id) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -364,14 +366,20 @@
     showScreen('screen-error');
   }
 
-  // ── 步驟 1：選班級 → 抓課程清單 ──
+  // ── 步驟 1：選班級 → 抓課程清單（有快取則立即顯示）──
   async function selectClass(className) {
     selectedClass = className;
+    prefetchPromise = null; // 換班級時重置預載
+    if (courseCache[className]) {
+      renderCourseScreen(courseCache[className]);
+      return;
+    }
     showScreen('screen-loading');
     try {
       const res = await fetch(`${API_URL}?action=getCourses&class=${encodeURIComponent(className)}`);
       const data = await res.json();
       if (data.success && data.courses && data.courses.length > 0) {
+        courseCache[className] = data.courses; // 存進快取
         renderCourseScreen(data.courses);
       } else {
         showError('這個班級目前沒有課程題目，請聯繫管理員。');
@@ -406,26 +414,33 @@
     showScreen('screen-course');
   }
 
-  // ── 步驟 2：選課程 → 顯示題型選擇 ──
+  // ── 步驟 2：選課程 → 顯示題型選擇 + 背景預載題目 ──
   function selectCourse(course) {
     selectedCourse = course;
     document.getElementById('type-breadcrumb').innerHTML =
       `班級：<strong>${selectedClass}</strong>　課程：<strong>${selectedCourse}</strong>`;
     showScreen('screen-type');
+    // 使用者思考題型的時間用來預載「全部」題目（順便暖 Apps Script 快取）
+    const params = new URLSearchParams({ action: 'getQuestions', class: selectedClass, course, type: 'all' });
+    prefetchPromise = fetch(`${API_URL}?${params}`).then(r => r.json()).catch(() => null);
   }
 
   // ── 步驟 3：選題型 → 抓題目 → 開始答題 ──
   async function startQuiz(type) {
     showScreen('screen-loading');
     try {
-      const params = new URLSearchParams({
-        action: 'getQuestions',
-        class: selectedClass,
-        course: selectedCourse,
-        type: type
-      });
-      const res = await fetch(`${API_URL}?${params}`);
-      const data = await res.json();
+      let data = null;
+      // 若選「全部混合」且預載已完成，直接使用（零等待）
+      if (type === 'all' && prefetchPromise) {
+        data = await prefetchPromise;
+        prefetchPromise = null;
+      }
+      // 選擇題 / 填充題仍需打 API；但 Apps Script 快取已被預載暖好，速度快很多
+      if (!data || !data.success) {
+        const params = new URLSearchParams({ action: 'getQuestions', class: selectedClass, course: selectedCourse, type });
+        const res = await fetch(`${API_URL}?${params}`);
+        data = await res.json();
+      }
       if (data.success && data.questions && data.questions.length > 0) {
         questions = data.questions.map(apiToQuestion);
         currentQ = 0;
